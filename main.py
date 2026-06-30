@@ -11,7 +11,6 @@ Thread(target=run, daemon=True).start()
 
 # كودك القديم وباقي الملف ح ينزل تلقائياً تحتهم (مثل import analyzer أو غيره)
 # main.py
-import keep_alive
 import logging
 import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
