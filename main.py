@@ -19,11 +19,11 @@ import config
 import database
 import analyzer
 
-# 🎯 ربط المعرفات الرسمية المأخوذة من لقطات الشاشة مباشرة بالسيستم
+# 🎯 ربط المعرفات الرسمية الخاصة بجروباتك مباشرة بالسيستم لحقن الصفقات
 ADMIN_GROUP_ID = -1003310992331
 VIP_GROUP_ID = -1004372200363
 
-# مخزن مؤقت ذكي لحفظ الصفقات لتجنب مشكلة حد الـ 64 بايت في أزرار تيليجرام
+# مخزن مؤقت ذكي لحفظ الصفقات وتجنب مشكلة حد الـ 64 بايت في أزرار تيليجرام
 PENDING_SIGNALS = {}
 SIGNAL_ID_COUNTER = 0
 FREE_TRIAL_COUNTER = {}
@@ -39,6 +39,7 @@ async def auto_signal_scheduler(application: Application):
                 df = analyzer.get_live_data(asset, "30m")
                 signal, score = analyzer.calculate_signals(df)
                 
+                # إرسال المسودة للإدارة للمراجعة (سواء شراء أو بيع أو أمر معلق)
                 if signal and score >= 8:
                     SIGNAL_ID_COUNTER += 1
                     PENDING_SIGNALS[SIGNAL_ID_COUNTER] = {
@@ -56,7 +57,7 @@ async def auto_signal_scheduler(application: Application):
                                  f"🟢 **سعر الدخول المقترح:** {signal['entry']}\n" \
                                  f"🎯 **الهدف (TP):** {signal['tp']}\n" \
                                  f"🛑 **وقف الخسارة (SL):** {signal['sl']}\n" \
-                                 f"⭐ **قوة دقة الفلتر:** {score}/10\n\n" \
+                                 f"⭐ **قوة دقة الفلتر الفني:** {score}/10\n\n" \
                                  f"👇 اضغط على قرارك لحقن الصفقة رسمياً في جروب الـ VIP:"
                                  
                     keyboard = [[
@@ -66,7 +67,7 @@ async def auto_signal_scheduler(application: Application):
                     await application.bot.send_message(chat_id=ADMIN_GROUP_ID, text=admin_text, reply_markup=InlineKeyboardMarkup(keyboard))
         except Exception as e:
             print(f"خطأ في مجدول الإدارة: {e}")
-        await asyncio.sleep(300)
+        await asyncio.sleep(300) # فحص مستمر ومستقر كل 5 دقائق
 
 async def post_init(application: Application):
     asyncio.create_task(auto_signal_scheduler(application))
@@ -83,7 +84,7 @@ async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
         
     asset = context.args[0].upper()
-    await update.message.reply_text(f"🚀 أمر فوري من اللّيدر! جاري فحص {asset} الحين بقوة 10 مؤشرات...")
+    await update.message.reply_text(f"🚀 أمر فوري من اللّيدر! جاري فحص {asset} الحين بقوة 10 مؤشرات داخلية صلبة...")
     
     try:
         df = analyzer.get_live_data(asset, "30m")
@@ -104,16 +105,16 @@ async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                          f"🟢 **سعر الدخول:** {signal['entry']}\n" \
                          f"🎯 **الهدف (TP):** {signal['tp']}\n" \
                          f"🛑 **وقف الخسارة (SL):** {signal['sl']}\n" \
-                         f"⭐ **دقة المطابقة الفنية:** {score}/10"
+                         f"⭐ **دقة المطابقة الفنية للسيستم:** {score}/10"
             keyboard = [[
                 InlineKeyboardButton("✅ موافقة ونشر بالـ VIP", callback_data=f"vip_pay_{SIGNAL_ID_COUNTER}"),
-                InlineKeyboardButton("❌ إلغاء", callback_data=f"vip_rej_{SIGNAL_ID_COUNTER}")
+                InlineKeyboardButton("❌ إلغاء الصفقة", callback_data=f"vip_rej_{SIGNAL_ID_COUNTER}")
             ]]
             await update.message.reply_text(admin_text, reply_markup=InlineKeyboardMarkup(keyboard))
         else:
-            await update.message.reply_text(f"❌ تم الفحص فوراً، ولكن لا توجد إشارة مستقرة ومؤكدة لـ {asset} حالياً.")
+            await update.message.reply_text(f"❌ تم الفحص فوراً، ولكن لا توجد إشارة فنية مستقرة ومؤكدة لـ {asset} حالياً.")
     except Exception as e:
-        await update.message.reply_text(f"❌ حدث خطأ أثناء سحب البيانات الفورية: {e}")
+        await update.message.reply_text(f"❌ حدث خطأ تقني أثناء سحب البيانات الفورية: {e}")
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -121,7 +122,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [['📊 طلب صفقة مضاربة', '👑 مجاني VIP اشتراك'], ['📞 الدعم الفني']]
     await update.message.reply_text(
         f"أهلاً بك يا {user.first_name} في نظام الرادار الآلي المطوّر 🚀\n\n"
-        f"🎁 حسابك مفعل للحصول على **(3 صفقات مجانية يومياً)** فائقة الدقة لتجربة مصداقية النظام بنفسك قبل الانتقال للـ VIP!", 
+        f"🎁 حسابك مفعل تلقائياً للحصول على **(3 صفقات مجانية يومياً)** فائقة الدقة لتجربة مصداقية السيستم بنفسك قبل الانتقال للـ VIP!", 
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     )
 
@@ -145,6 +146,7 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         user_data = database.get_user(user_id)
         is_vip = user_data and user_data.get('justmarkets_id')
 
+        # سيستم الـ 3 صفقات المجانية الصارم لتوليد الثقة
         if not is_vip:
             current_count = FREE_TRIAL_COUNTER.get(user_id, 0)
             if current_count >= 3:
@@ -181,7 +183,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         await query.message.reply_text("📝 أرسل الحين رقم حسابك (ID) المفتوح في JustMarkets المكون من أرقام فقط:")
         return
 
-    # معالجة قرار الإدارة ونشر الصفقة بأمان كامل عبر الرقم التعريفي الصغير
+    # معالجة قرار الإدارة ونشر الصفقة بأمان كامل عبر الرقم التعريفي القصير والمحمي
     if data.startswith("vip_pay_"):
         sig_id = int(data.split("_")[2])
         sig = PENDING_SIGNALS.get(sig_id)
@@ -198,17 +200,17 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             try:
                 await context.bot.send_message(chat_id=VIP_GROUP_ID, text=vip_text)
                 await query.edit_message_text(f"✅ تم اعتماد الصفقة بنجاح ونشرها فوراً داخل جروب الـ VIP!")
-                PENDING_SIGNALS.pop(sig_id, None) # تنظيف الذاكرة بعد النشر لعدم التثقيل
+                PENDING_SIGNALS.pop(sig_id, None) # تنظيف المخزن فوراً لحماية الرام
             except Exception as e:
                 await query.edit_message_text(f"❌ تم الاعتماد ولكن فشل النشر الآلي، تأكد من إضافة البوت مشرفاً بجروب الـ VIP. الخطأ: {e}")
         else:
-            await query.edit_message_text("⚠️ هذه الصفقة تم معالجتها سابقاً أو انتهت صلاحيتها.")
+            await query.edit_message_text("⚠️ هذه الصفقة تم معالجتها سابقاً أو انتهت صلاحيتها الفنية.")
         return
 
     if data.startswith("vip_rej_"):
         sig_id = int(data.split("_")[2])
         PENDING_SIGNALS.pop(sig_id, None)
-        await query.edit_message_text("❌ تم رفض هذه الإشارة واستبعادها بنجاح.")
+        await query.edit_message_text("❌ تم رفض هذه الإشارة واستبعادها بنجاح بواسطة اللّيدر.")
         return
 
     if data.startswith("asset_"):
@@ -232,16 +234,16 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
                 reply_text = f"🎯 **نتائج رادار التحليل الفني المصفّى** 🎯\n\n" \
                              f"🔹 **الأصل:** {asset} | **الفريم:** {timeframe}\n" \
                              f" ---------------------------------- \n" \
-                             f"📈 **الحالة الفنية:** {signal['type']}\n" \
+                             f"📈 **الحالة الفنية للترند:** {signal['type']}\n" \
                              f"🟢 **نقطة الدخول المقترحة:** {signal['entry']}\n" \
                              f"🎯 **الهدف المحسوب (TP):** {signal['tp']}\n" \
                              f"🛑 **وقف الخسارة (SL):** {signal['sl']}\n" \
-                             f"⭐ **قوة تأكيد الاستراتيجية:** {score}/10"
+                             f"⭐ **قوة تأكيد الاستراتيجية الحالية:** {score}/10"
             else:
-                reply_text = f"❌ الرادار يفحص الأسواق الآن، ولكن لا توجد إشارة نقية 100% متطابقة لـ {asset} على فريم {timeframe} حالياً. انتظر فرصة أفضل."
+                reply_text = f"❌ الرادار يفحص الأسواق الآن بدقة، ولكن لا توجد إشارة نقية 100% متطابقة لـ {asset} على فريم {timeframe} حالياً. انتظر فرصة أفضل لحماية حسابك."
             await query.message.reply_text(reply_text)
         except Exception as e:
-            await query.message.reply_text(f"❌ عذراً، حدثت مشكلة تقنية مؤقتة أثناء جلب الشموع: {e}")
+            await query.message.reply_text(f"❌ عذراً، حدثت مشكلة تقنية مؤقتة أثناء جلب الشموع الحية: {e}")
 
 if __name__ == '__main__':
     TOKEN = "8518436165:AAH2-DjOv0lh9EPpeatvKhAIX-l0DvvvIfY"
