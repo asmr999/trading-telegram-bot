@@ -65,4 +65,4 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text("إختر الأصل المالي:", reply_markup=InlineKeyboardMarkup(keyboard))
     elif text == '👑 اشتراك VIP مجاني':
         keyboard = [[InlineKeyboardButton("🔗 1. فتح حساب في JustMarkets وبدء التداول", url=config.JUSTMARKETS_REF_LINK)],
-                    [InlineKeyboardButton("📝 2. ربط وتوقيع رقم حسابك بالبوت", callback_data='regis
+                    [InlineKeyboardButton("📝 2. ربط وتوقيع رقم حسابك بالبوت", callback_data='register')],
