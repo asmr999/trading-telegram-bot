@@ -80,5 +80,3 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
             [InlineKeyboardButton("🔗 1. فتح حساب في JustMarkets وبدء التداول", url=config.JUSTMARKETS_REF_LINK)],
             [InlineKeyboardButton('📝 2. ربط وتوثيق رقم حسابك بالبوت', callback_data='register')]
         ]
-import time
-while True: time.sleep(60)
