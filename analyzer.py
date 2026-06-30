@@ -1,4 +1,4 @@
-tp = (df['low'] + df['close']) / 3
+    tp = (df['low'] + df['close']) / 3
         mad = tp.rolling(window=20).apply(lambda x: np.abs(x - x.mean()).mean(), raw=True)
         cci = (tp - tp.rolling(window=20).mean()) / (0.015 * mad + 1e-9)
         if (is_uptrend and cci.iloc[-1] > 50) or (not is_uptrend and cci.iloc[-1] < -50): score += 1
