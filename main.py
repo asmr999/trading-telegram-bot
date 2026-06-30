@@ -1,21 +1,17 @@
 from flask import Flask, request, jsonify
 from threading import Thread
 import os
-import logging
 import asyncio
-import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, CallbackQueryHandler
 
-# تشغيل سيرفر الويب المتطور لمنصة Render لاستقبال إشارات TradingView والعمل 24 ساعة
 app = Flask('')
-application_global = None  # مرجع عالمي للبوت لإرسال الرسائل فوراً عند وصول إشارة خارجية
+application_global = None  
 
 @app.route('/')
 def home(): 
     return "Official High-Precision Multi-Group System with Webhooks is Active!"
 
-# 🔗 [بوابة TradingView السحرية] - تستقبل الإشارات من مؤشرات الشارت مباشرة وتنشرها فوراً
 @app.route('/webhook', methods=['POST'])
 def tradingview_webhook():
     global application_global
@@ -23,7 +19,6 @@ def tradingview_webhook():
     if not data or not application_global:
         return jsonify({"status": "ignored", "reason": "no data or bot not ready"}), 400
         
-    # استقبال البيانات المخصصة القادمة من تنبيهات تريدنج فيو
     asset = data.get('asset', 'XAUUSD').upper()
     signal_type = data.get('type', 'BUY LIMIT ⏳')
     entry = data.get('entry', '0.0')
@@ -39,7 +34,6 @@ def tradingview_webhook():
                f"🛑 *وقف الخسارة الآمن (SL):* `{sl}`\n\n" \
                f"⚠️ *تم رصد منطقة الارتداد مسبقاً عبر نظام الـ Webhooks اللحظي!* 🔥"
                
-    # إرسال الصفقة فوراً لجروب الـ VIP بدون أي تأخير
     asyncio.run_coroutine_threadsafe(
         application_global.bot.send_message(chat_id=-1004372200363, text=vip_text, parse_mode="Markdown"),
         application_global.loop
@@ -63,14 +57,6 @@ FREE_TRIAL_COUNTER = {}
 GOLDEN_SIGNAL_TRACKER = {}  
 LAST_SENT_SIGNALS = {}  
 
-# دالة فحص الإجماع العالمي السريعة من Investing (صمام أمان إضافي)
-def check_investing_consensus(asset):
-    try:
-        # فحص صامت لمحاكاة الإجماع والاتجاه العام لضمان أمان الصفقة مية بالمية
-        return True
-    except:
-        return True
-
 async def auto_signal_scheduler(application: Application):
     global SIGNAL_ID_COUNTER
     print("... تم إطلاق رادار الفحص التلقائي الذكي للإدارة (مانع التكرار نشط) ...")
@@ -79,7 +65,7 @@ async def auto_signal_scheduler(application: Application):
         try:
             for asset in ["XAUUSD", "EURUSD", "BTCUSDT"]:
                 df = analyzer.get_live_data(asset, "30m")
-                signal, score = analyzer.calculate_signals(df)
+                signal, score = analyzer.calculate_signals(df, asset)
                 
                 if signal and score >= 8:
                     signal_fingerprint = f"{signal['type']}_{signal['entry']}"
@@ -113,7 +99,7 @@ async def auto_signal_scheduler(application: Application):
 
 async def post_init(application: Application):
     global application_global
-    application_global = application # حفظ نسخة البوت للـ Webhook الخارجي
+    application_global = application 
     asyncio.create_task(auto_signal_scheduler(application))
 
 async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -124,12 +110,12 @@ async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ يرجى كتابة اسم الأصل المالي مع الأمر، مثال:\n`/check XAUUSD`")
         return
     asset = context.args[0].upper()
-    await update.message.reply_text(f"🚀 أمر فوري من اللّيدر! جاري فحص {asset} الحين بقوة 10 مؤشرات داخلية صلبة ومواقع التحليل...")
+    await update.message.reply_text(f"🚀 أمر فوري من اللّيدر! جاري فحص {asset} الحين بقوة الفلاتر المؤسسية ومواقع التحليل...")
     
     try:
         df = analyzer.get_live_data(asset, "30m")
-        signal, score = analyzer.calculate_signals(df)
-        if signal and check_investing_consensus(asset):
+        signal, score = analyzer.calculate_signals(df, asset)
+        if signal:
             SIGNAL_ID_COUNTER += 1
             PENDING_SIGNALS[SIGNAL_ID_COUNTER] = {
                 "asset": asset, "type": signal['type'], "entry": signal['entry'], "tp": signal['tp'], "sl": signal['sl']
@@ -147,7 +133,7 @@ async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]]
             await update.message.reply_text(admin_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         else:
-            await update.message.reply_text(f"❌ تم الفحص فوراً، ولكن لا توجد إشارة فنية مستقرة ومؤكدة لـ {asset} حالياً.")
+            await update.message.reply_text(f"❌ تم الفحص فوراً، ولكن لا توجد إشارة فنية مستقرة ومؤكدة لـ {asset} حالياً (أو خارج ساعات السيولة الرسمية للذهب).")
     except Exception as e:
         await update.message.reply_text(f"❌ حدث خطأ تقني أثناء سحب البيانات الفورية: {e}")
 
@@ -159,7 +145,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [['📊 طلب صفقة مضاربة', '👑 مجاني VIP اشتراك'], ['📞 الدعم الفني']]
     await update.message.reply_text(
         f"أهلاً بك يا {user.first_name} في نظام الرادار الآلي المطوّر 🚀\n\n"
-        f"🎁 حسابك مفعل تلقائياً للحصول على **(3 صفقات ناجحة يومياً)** فائقة الدقة لتجربة مصداقية السيستم بنفسك قبل الانتقال للـ VIP!", 
+        f"🎁 حسابك مفعل تلقائياً للحصول على **(3 صفقات ناجحة يومياً)** فائدة الدقة لتجربة مصداقية السيستم بنفسك قبل الانتقال للـ VIP!", 
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     )
 
@@ -288,13 +274,13 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             await query.edit_message_text("❌ انتهى رصيد صفقاتك المجانية المتاحة لليوم! يرجى الترقية للـ VIP للاستمرار.")
             return
 
-        await query.edit_message_text(f"🔍 الرادار الذكي يفحص ويحلل {asset} على فريم ({timeframe}) ومواقع التحليل... ثواني ⏳")
+        await query.edit_message_text(f"🔍 الرادار الذكي يفحص ويحلل {asset} على فريم ({timeframe})... ثواني ⏳")
         
         try:
             df = analyzer.get_live_data(asset, timeframe)
-            signal, score = analyzer.calculate_signals(df)
+            signal, score = analyzer.calculate_signals(df, asset)
             
-            if signal and check_investing_consensus(asset):
+            if signal:
                 if not is_vip:
                     if score >= 9 and GOLDEN_SIGNAL_TRACKER.get(user_id, 0) == 0:
                         GOLDEN_SIGNAL_TRACKER[user_id] = 1 
@@ -316,10 +302,10 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
                              f"📈 *الحالة الفنية للترند:* {signal['type']}\n" \
                              f"🟢 *نقطة الدخول المقترحة:* `{signal['entry']}`\n" \
                              f"🎯 *الهدف المحسوب (TP):* `{signal['tp']}`\n" \
-                             f"🛑 *وقف الخسارة (SL):* `{sig['sl'] if 'sig' in locals() else signal['sl']}`\n" \
+                             f"🛑 *وقف الخسارة (SL):* `{signal['sl']}`\n" \
                              f"⭐ *قوة تأكيد الاستراتيجية الحالية:* {score}/10" + trial_footer
             else:
-                reply_text = f"❌ الرادار يفحص الأسواق الآن بدقة، ولكن لا توجد إشارة نقية 100% متطابقة لـ {asset} على فريم {timeframe} حالياً.\n\n🛡️ *حفاظاً على أمان حسابك لم يتم توليد توصية ولم يتم خصم أي شيء من رصيدك اليومي المجاني.*"
+                reply_text = f"❌ الرادار يفحص الأسواق الآن بدقة، ولكن لا توجد إشارة نقية 100% متطابقة لـ {asset} على فريم {timeframe} حالياً (أو خارج ساعات السيولة الرسمية للذهب).\n\n🛡️ *حفاظاً على أمان حسابك لم يتم توليد توصية ولم يتم خصم أي شيء من رصيدك اليومي المجاني.*"
                 
             await query.message.reply_text(reply_text, parse_mode="Markdown")
         except Exception as e:
