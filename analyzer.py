@@ -10,7 +10,7 @@ def get_live_data(asset, timeframe):
     yf_intervals = {"15m": "15m", "30m": "30m", "1h": "1h", "4h": "1h"}
     
     try:
-        if asset == "BTCUSDT":
+        if asset == "BTCUSDT" or asset == "BTCUSD":
             binance_intervals = {"15m": "15m", "30m": "30m", "1h": "1h", "4h": "4h"}
             chosen_tf = binance_intervals.get(timeframe, "30m")
             url = f"https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval={chosen_tf}&limit=100"
@@ -52,15 +52,40 @@ def get_live_data(asset, timeframe):
 
 def calculate_signals(df):
     """
-    🧠 المخ الفني المستقل - نظام الـ 10 مؤشرات الرقمية المحسوبة داخلياً بالكامل
+    🧠 المخ الفني المطوّر - نظام مؤشرات رياضي صلب مبني على الـ ATR الحقيقي والـ Pivot الثابت
     """
-    if df is None or len(df) < 50:
+    if df is None or len(df) < 30:
         return None, 0
 
-    close = df['close']
-    high = df['high']
-    low = df['low']
+    close = df['close'].astype(float)
+    high = df['high'].astype(float)
+    low = df['low'].astype(float)
+
+    # 1️⃣ حساب مؤشر الـ ATR الحقيقي لقياس Volatility السوق بدقة متناهية
+    high_low = high - low
+    high_cp = np.abs(high - close.shift(1))
+    low_cp = np.abs(low - close.shift(1))
+    tr_df = pd.DataFrame({'hl': high_low, 'hcp': high_cp, 'lcp': low_cp})
+    true_range = tr_df.max(axis=1)
+    atr_series = true_range.rolling(window=14).mean()
     
+    c_atr = atr_series.iloc[-1]
+    if np.isnan(c_atr) or c_atr <= 0:
+        c_atr = close.iloc[-1] * 0.0025 # صمام أمان احتياطي
+
+    # 2️⃣ حساب نقاط الدعم والمقاومة الكلاسيكية بناءً على الشمعة السابقة المنتهية (ثابتة وموثوقة)
+    prev_high = high.iloc[-2]
+    prev_low = low.iloc[-2]
+    prev_close = close.iloc[-2]
+
+    pivot = (prev_high + prev_low + prev_close) / 3
+    r1 = (2 * pivot) - prev_low
+    s1 = (2 * pivot) - prev_high
+
+    # الأسعار الحالية اللحظية
+    c_close = close.iloc[-1]
+
+    # 3️⃣ استخراج قراءات الاتجاه والزخم والسيولة
     ema_20 = close.ewm(span=20, adjust=False).mean()
     ema_50 = close.ewm(span=50, adjust=False).mean()
     
@@ -69,38 +94,19 @@ def calculate_signals(df):
     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
     rs = gain / (loss + 1e-10)
     rsi = 100 - (100 / (1 + rs))
-    
+
     exp1 = close.ewm(span=12, adjust=False).mean()
     exp2 = close.ewm(span=26, adjust=False).mean()
     macd = exp1 - exp2
     signal_line = macd.ewm(span=9, adjust=False).mean()
-    histogram = macd - signal_line
-    
-    bb_middle = close.rolling(window=20).mean()
-    bb_std = close.rolling(window=20).std()
-    
-    low_14 = low.rolling(window=14).min()
-    high_14 = high.rolling(window=14).max()
-    stoch_k = 100 * ((close - low_14) / (high_14 - low_14 + 1e-10))
-    stoch_d = stoch_k.rolling(window=3).mean()
 
-    pivot = (high.rolling(14).max() + low.rolling(14).min() + close) / 3
-    r1 = (2 * pivot) - low.rolling(14).min()
-    s1 = (2 * pivot) - high.rolling(14).max()
-
-    c_close = close.iloc[-1]
+    c_ema20 = ema_20.iloc[-1]
+    c_ema50 = ema_50.iloc[-1]
     c_rsi = rsi.iloc[-1]
     c_macd = macd.iloc[-1]
     c_signal = signal_line.iloc[-1]
-    c_hist = histogram.iloc[-1]
-    c_k = stoch_k.iloc[-1]
-    c_d = stoch_d.iloc[-1]
-    c_r1 = r1.iloc[-1]
-    c_s1 = s1.iloc[-1]
-    c_ema20 = ema_20.iloc[-1]
-    c_ema50 = ema_50.iloc[-1]
-    c_bb_middle = bb_middle.iloc[-1]
 
+    # سيستم التصويت الرقمي
     buy_score = 0
     sell_score = 0
 
@@ -108,56 +114,45 @@ def calculate_signals(df):
     else: sell_score += 1
     if c_close > c_ema50: buy_score += 1
     else: sell_score += 1
-
     if c_rsi > 50: buy_score += 1
-    if 50 < c_rsi < 70: buy_score += 1
-    if c_rsi < 50: sell_score += 1
-    if 30 < c_rsi < 50: sell_score += 1
-
+    else: sell_score += 1
     if c_macd > c_signal: buy_score += 1
-    if c_hist > 0: buy_score += 1
-    if c_macd < c_signal: sell_score += 1
-    if c_hist < 0: sell_score += 1
-
-    if c_close > c_bb_middle: buy_score += 1
     else: sell_score += 1
 
-    if c_k > c_d: buy_score += 1
-    else: sell_score += 1
-
-    atr = c_close * 0.0035
     final_score = max(buy_score, sell_score)
+    display_score = int((final_score / 4) * 10) # تحويل لنسبة مئوية من 10 لتظهر فخمة للمستخدم
 
-    if buy_score >= 8 and c_close > c_s1:
-        signal = {
-            "type": "BUY MARKET 📈 (شراء فوري)",
-            "entry": round(c_close, 2 if c_close > 100 else 4),
-            "tp": round(c_close + atr, 2 if c_close > 100 else 4),
-            "sl": round(c_close - atr, 2 if c_close > 100 else 4)
-        }
-        return signal, final_score
-    elif sell_score >= 8 and c_close < c_r1:
-        signal = {
-            "type": "SELL MARKET 📉 (بيع فوري)",
-            "entry": round(c_close, 2 if c_close > 100 else 4),
-            "tp": round(c_close - atr, 2 if c_close > 100 else 4),
-            "sl": round(c_close + atr, 2 if c_close > 100 else 4)
-        }
-        return signal, final_score
-    else:
-        if buy_score > sell_score:
+    # 4️⃣ بناء استراتيجية القناص الاحترافية (إدارة صفقات حقيقية)
+    if buy_score >= 3:
+        if c_close > r1:
             signal = {
-                "type": "WAIT / PENDING ⏳ (أمر شراء معلق)",
-                "entry": round(c_s1, 2 if c_close > 100 else 4),
-                "tp": round(c_s1 + atr, 2 if c_close > 100 else 4),
-                "sl": round(c_s1 - (atr * 0.5), 2 if c_close > 100 else 4)
+                "type": "BUY MARKET 📈 (شراء فوري)",
+                "entry": round(c_close, 2 if c_close > 100 else 4),
+                "tp": round(c_close + (2 * c_atr), 2 if c_close > 100 else 4), # إدارة أرباح ضعف المخاطرة 1:2
+                "sl": round(c_close - c_atr, 2 if c_close > 100 else 4)
             }
-            return signal, final_score
         else:
             signal = {
-                "type": "WAIT / PENDING ⏳ (أمر بيع معلق)",
-                "entry": round(c_r1, 2 if c_close > 100 else 4),
-                "tp": round(c_r1 - atr, 2 if c_close > 100 else 4),
-                "sl": round(c_r1 + (atr * 0.5), 2 if c_close > 100 else 4)
+                "type": "BUY LIMIT ⏳ (أمر شراء معلق)",
+                "entry": round(s1, 2 if c_close > 100 else 4),
+                "tp": round(s1 + (2 * c_atr), 2 if c_close > 100 else 4),
+                "sl": round(s1 - c_atr, 2 if c_close > 100 else 4)
             }
-            return signal, final_score
+        return signal, display_score
+
+    else:
+        if c_close < s1:
+            signal = {
+                "type": "SELL MARKET 📉 (بيع فوري)",
+                "entry": round(c_close, 2 if c_close > 100 else 4),
+                "tp": round(c_close - (2 * c_atr), 2 if c_close > 100 else 4),
+                "sl": round(c_close + c_atr, 2 if c_close > 100 else 4)
+            }
+        else:
+            signal = {
+                "type": "SELL LIMIT ⏳ (أمر بيع معلق)",
+                "entry": round(r1, 2 if c_close > 100 else 4),
+                "tp": round(r1 - (2 * c_atr), 2 if c_close > 100 else 4),
+                "sl": round(r1 + c_atr, 2 if c_close > 100 else 4)
+            }
+        return signal, display_score
