@@ -52,7 +52,6 @@ def calculate_signals(df, asset_name="XAUUSD"):
         return None, 0
 
     # 🛑 [البوابة الأولى: فلتر جلسات السيولة الحوتية الصارم]
-    # الذهب والفوركس يتطلب سيولة بنكية؛ نمنع التداول وقت الفجر والساعات الميتة لقطع الصفقات العشوائية
     if "BTC" not in asset_name.upper():
         current_utc_hour = datetime.datetime.utcnow().hour
         # السماح فقط بفترة نشاط بورصات لندن ونيويورك (من 07:00 صباحاً إلى 21:00 مساءً بتوقيت UTC)
@@ -90,14 +89,14 @@ def calculate_signals(df, asset_name="XAUUSD"):
         final_lower[i] = bls.iloc[i] if bls.iloc[i] > final_lower[i-1] or close.iloc[i-1] < final_lower[i-1] else final_lower[i-1]
         st_trend[i] = 1 if close.iloc[i] > final_upper[i] else (-1 if close.iloc[i] < final_lower[i] else st_trend[i-1])
     
-    c_supertrend = st_trend[-1] # الاتجاه الحالي للسوبر تريند (1 شراء، -1 بيع)
+    c_supertrend = st_trend[-1]
 
     # 3️⃣ [البوابة الثالثة: مستويات الفيبوناتشي الديناميكية لآخر موجة سعرك]
     max_h = high.rolling(window=30).max().iloc[-1]
     min_l = low.rolling(window=30).min().iloc[-1]
     wave_height = max_h - min_l
-    fib_50 = min_l + 0.50 * wave_height    # مستوى 50% المغناطيسي
-    fib_618 = min_l + 0.618 * wave_height  # المستوى الذهبي الأقوى 61.8%
+    fib_50 = min_l + 0.50 * wave_height    
+    fib_618 = min_l + 0.618 * wave_height  
 
     # 4️⃣ فحص سيولة الحيتان الكاشفة (Volume Spike)
     avg_volume = volume.rolling(window=20).mean().iloc[-1]
@@ -135,21 +134,18 @@ def calculate_signals(df, asset_name="XAUUSD"):
     final_score = max(buy_score, sell_score)
     display_score = int((final_score / 4) * 10)
 
-    # إعدادات أهداف الاسكالبينج المضمونة والقصيرة جداً لحصد الأرباح فوراً وتجنب الانعكاس
     short_target_dist = 1.0 * c_atr 
     stop_loss_dist = 1.0 * c_atr
     decimal_places = 2 if c_close > 100 else 4
 
     # 6️⃣ الفلترة النهائية القاطعة للعشوائية (التطابق الكامل والشامل)
-    # شرط الشراء المصفى: تصويت صاعد + السوبر تريند أخضر (1) + تأكيد سيولة فوليوم إيجابية
     if buy_score >= 3 and c_supertrend == 1 and volume_confirmed:
         max_chase = c_atr * 0.30
-        # إذا السعر الحالي ابتعد عن مستوى الدعم الفيبوناتشي، نضعه كأمر معلق مسبق عند خط الفيبوناتشي الذهبي بالملّي!
         if (c_close - fib_618) > max_chase:
             signal = {
                 "type": "BUY LIMIT ⏳ (أمر شراء معلق مسبق)",
-                "entry": round(fib_618, decimal_places), # دخول من خط الفيبوناتشي الذهبي بالملّي (Sniper Entry)
-                "tp": round(fib_618 + short_target_dist, decimal_places), # هدف قصير على الفرازة يربح فوراً
+                "entry": round(fib_618, decimal_places), 
+                "tp": round(fib_618 + short_target_dist, decimal_places), 
                 "sl": round(fib_618 - stop_loss_dist, decimal_places)
             }
         else:
@@ -161,13 +157,12 @@ def calculate_signals(df, asset_name="XAUUSD"):
             }
         return signal, display_score
 
-    # شرط البيع المصفى: تصويت هابط + السوبر تريند أحمر (-1) + تأكيد سيولة فوليوم بيعية
     elif sell_score >= 3 and c_supertrend == -1 and volume_confirmed:
         max_chase = c_atr * 0.30
         if (fib_50 - c_close) > max_chase:
             signal = {
                 "type": "SELL LIMIT ⏳ (أمر بيع معلق مسبق)",
-                "entry": round(fib_50, decimal_places), # الدخول من منطقة الارتداد المسبقة للفيبوناتشي
+                "entry": round(fib_50, decimal_places), 
                 "tp": round(fib_50 - short_target_dist, decimal_places),
                 "sl": round(fib_50 + stop_loss_dist, decimal_places)
             }
@@ -180,5 +175,4 @@ def calculate_signals(df, asset_name="XAUUSD"):
             }
         return signal, display_score
 
-    # لو حدث أي تعارض أو الشروط مش كاملة 100%، البوت بيلغي التوصية فوراً لحماية أموال الناس ومصداقيتك
     return None, 0
