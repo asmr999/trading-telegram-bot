@@ -39,7 +39,6 @@ async def auto_signal_scheduler(application: Application):
                 df = analyzer.get_live_data(asset, "30m")
                 signal, score = analyzer.calculate_signals(df)
                 
-                # إرسال المسودة للإدارة للمراجعة (سواء شراء أو بيع أو أمر معلق)
                 if signal and score >= 8:
                     SIGNAL_ID_COUNTER += 1
                     PENDING_SIGNALS[SIGNAL_ID_COUNTER] = {
@@ -67,7 +66,7 @@ async def auto_signal_scheduler(application: Application):
                     await application.bot.send_message(chat_id=ADMIN_GROUP_ID, text=admin_text, reply_markup=InlineKeyboardMarkup(keyboard))
         except Exception as e:
             print(f"خطأ في مجدول الإدارة: {e}")
-        await asyncio.sleep(300) # فحص مستمر ومستقر كل 5 دقائق
+        await asyncio.sleep(300)
 
 async def post_init(application: Application):
     asyncio.create_task(auto_signal_scheduler(application))
@@ -103,8 +102,8 @@ async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                          f"📊 **الأصل المالي:** {asset}\n" \
                          f"⚙️ **حالة الحركة:** {signal['type']}\n" \
                          f"🟢 **سعر الدخول:** {signal['entry']}\n" \
-                         f"🎯 **الهدف (TP):** {signal['tp']}\n" \
-                         f"🛑 **وقف الخسارة (SL):** {signal['sl']}\n" \
+                         f"🎯 **الهدف (TP):** {sig['tp'] if 'sig' in locals() else signal['tp']}\n" \
+                         f"🛑 **وقف الخسارة (SL):** {sig['sl'] if 'sig' in locals() else signal['sl']}\n" \
                          f"⭐ **دقة المطابقة الفنية للسيستم:** {score}/10"
             keyboard = [[
                 InlineKeyboardButton("✅ موافقة ونشر بالـ VIP", callback_data=f"vip_pay_{SIGNAL_ID_COUNTER}"),
@@ -118,7 +117,9 @@ async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    database.add_user(user.id, user.username)
+    try:
+        if hasattr(database, 'add_user'): database.add_user(user.id, user.username)
+    except: pass
     keyboard = [['📊 طلب صفقة مضاربة', '👑 مجاني VIP اشتراك'], ['📞 الدعم الفني']]
     await update.message.reply_text(
         f"أهلاً بك يا {user.first_name} في نظام الرادار الآلي المطوّر 🚀\n\n"
@@ -131,28 +132,45 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     user_id = update.effective_user.id
     username = update.effective_user.username or "بدون معرف"
 
+    # 1️⃣ معالجة طلب توثيق JustMarkets
     if context.user_data.get('awaiting_jm_id'):
         context.user_data['awaiting_jm_id'] = False
         if not text.isdigit():
             await update.message.reply_text("⚠️ خطأ! أدخل أرقام حسابك المكون من أرقام فقط.")
             return
-        database.update_justmarkets_id(user_id, text)
+        try:
+            if hasattr(database, 'update_justmarkets_id'): database.update_justmarkets_id(user_id, text)
+        except: pass
         await update.message.reply_text("🎉 تم رفع طلبك بنجاح! جاري تدقيقه من قبل الإدارة لتفعيل ميزات الـ VIP غير المحدودة.")
         admin_alert = f"👤 **طلب توثيق عميل جديد**\n\n🔹 المشترك: @{username}\n🔹 الأي دي: {user_id}\n🔑 رقم حساب JustMarkets: {text}\n\nراجع لوحة الشركاء وفعل الحساب إذا كان تحت وكالتك بنجاح."
         await context.bot.send_message(chat_id=ADMIN_GROUP_ID, text=admin_alert)
         return
 
-    if text == '📊 طلب صفقة مضاربة':
-        user_data = database.get_user(user_id)
-        is_vip = user_data and user_data.get('justmarkets_id')
+    # 2️⃣ معالجة استقبال رسائل الدعم الفني وتحويلها للإدارة
+    if context.user_data.get('awaiting_support'):
+        context.user_data['awaiting_support'] = False
+        await update.message.reply_text("✅ تم إرسال رسالتك لفريق الدعم الفني بنجاح، وسيتم الرد عليك في أقرب وقت يا غالي!")
+        support_alert = f"📞 **رسالة واردة للدعم الفني**\n\n👤 **من المشترك:** @{username}\n🆔 **الأي دي:** {user_id}\n\n💬 **نص الرسالة:**\n{text}"
+        await context.bot.send_message(chat_id=ADMIN_GROUP_ID, text=support_alert)
+        return
 
-        # سيستم الـ 3 صفقات المجانية الصارم لتوليد الثقة
+    # 3️⃣ زر صفقات المضاربة (تم حمايته تماماً من الانهيار)
+    if text == '📊 طلب صفقة مضاربة':
+        is_vip = False
+        try:
+            user_data = None
+            if hasattr(database, 'get_user'): user_data = database.get_user(user_id)
+            if user_data and isinstance(user_data, dict):
+                is_vip = bool(user_data.get('justmarkets_id'))
+        except Exception as e:
+            print(f"🛡️ جدار حماية الداتابيز تجاوز الفحص بأمان: {e}")
+
         if not is_vip:
             current_count = FREE_TRIAL_COUNTER.get(user_id, 0)
             if current_count >= 3:
                 await update.message.reply_text(
                     "❌ **انتهت الفترة التجريبية المجانية الخاصة بك اليوم!**\n\n"
-                    "لأن صفقاتنا قيمتها عالية ومصفاة بدقة، نمنح 3 إشارات فقط للزوار الجدد. "
+                    "لأن صفقاتنا قيمتها عالية ومصفاة بدقة، نمنح 3 إشارات فقط للزوار الجدد.\n"
                     "لتفتح الصفقات مدى الحياة وبشكل غير محدود مجاناً، قم بفتح حساب عبر رابط وكالتنا الحين وضعه هنا 👇",
                     reply_markup=ReplyKeyboardMarkup([['👑 مجاني VIP اشتراك']], resize_keyboard=True)
                 )
@@ -173,6 +191,10 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
         ]
         await update.message.reply_text("👇 للحصول على الخدمات والتحليلات داخل جروب الـ VIP بشكل دائم وغير محدود، اتبع الخطوات التالية:", reply_markup=InlineKeyboardMarkup(keyboard))
 
+    elif text == '📞 الدعم الفني':
+        context.user_data['awaiting_support'] = True
+        await update.message.reply_text("📩 أرسل رسالتك الحين وسيتم تحويلها مباشرة لجروب الإدارة لمتابعتك فوراً.")
+
 async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -183,11 +205,9 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         await query.message.reply_text("📝 أرسل الحين رقم حسابك (ID) المفتوح في JustMarkets المكون من أرقام فقط:")
         return
 
-    # معالجة قرار الإدارة ونشر الصفقة بأمان كامل عبر الرقم التعريفي القصير والمحمي
     if data.startswith("vip_pay_"):
         sig_id = int(data.split("_")[2])
         sig = PENDING_SIGNALS.get(sig_id)
-        
         if sig:
             vip_text = f"🚨 **إشارة تداول رسمية معتمدة من الإدارة** 👑\n\n" \
                        f"📊 **الأصل المالي:** {sig['asset']}\n" \
@@ -200,9 +220,9 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             try:
                 await context.bot.send_message(chat_id=VIP_GROUP_ID, text=vip_text)
                 await query.edit_message_text(f"✅ تم اعتماد الصفقة بنجاح ونشرها فوراً داخل جروب الـ VIP!")
-                PENDING_SIGNALS.pop(sig_id, None) # تنظيف المخزن فوراً لحماية الرام
+                PENDING_SIGNALS.pop(sig_id, None)
             except Exception as e:
-                await query.edit_message_text(f"❌ تم الاعتماد ولكن فشل النشر الآلي، تأكد من إضافة البوت مشرفاً بجروب الـ VIP. الخطأ: {e}")
+                await query.edit_message_text(f"❌ تم الاعتماد ولكن فشل النشر الآلي. الخطأ: {e}")
         else:
             await query.edit_message_text("⚠️ هذه الصفقة تم معالجتها سابقاً أو انتهت صلاحيتها الفنية.")
         return
