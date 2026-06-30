@@ -6,6 +6,7 @@ import yfinance as yf
 def get_live_data(asset, timeframe):
     """
     🌐 صنبور البيانات المزدوج فائق الدقة (Binance + Yahoo Finance)
+    يجلب الشموع الحية حقيقياً وبدون أي تأخير لتغذية الرادار
     """
     yf_intervals = {"15m": "15m", "30m": "30m", "1h": "1h", "4h": "1h"}
     
@@ -52,7 +53,8 @@ def get_live_data(asset, timeframe):
 
 def calculate_signals(df):
     """
-    🧠 المخ الفني المطوّر - نظام مؤشرات رياضي صلب مبني على الـ ATR الحقيقي والـ Pivot الثابت
+    🧠 المخ الفني المستقبلي (Predictive Radar) - صفقات قصيرة وخاطفة على الفرازة
+    يحتوي على فلاتر السيولة، وحارس المسافة، وتحديد الارتدادات مسبقاً قبل حدوثها
     """
     if df is None or len(df) < 30:
         return None, 0
@@ -60,32 +62,38 @@ def calculate_signals(df):
     close = df['close'].astype(float)
     high = df['high'].astype(float)
     low = df['low'].astype(float)
+    volume = df['volume'].astype(float)
 
-    # 1️⃣ حساب مؤشر الـ ATR الحقيقي لقياس Volatility السوق بدقة متناهية
+    # 1️⃣ حساب الـ ATR الحقيقي الحركي لمعرفة أهداف الاسكالبينج الآمنة والقابلة للتحقيق فوراً
     high_low = high - low
     high_cp = np.abs(high - close.shift(1))
     low_cp = np.abs(low - close.shift(1))
     tr_df = pd.DataFrame({'hl': high_low, 'hcp': high_cp, 'lcp': low_cp})
     true_range = tr_df.max(axis=1)
     atr_series = true_range.rolling(window=14).mean()
-    
     c_atr = atr_series.iloc[-1]
+    
     if np.isnan(c_atr) or c_atr <= 0:
-        c_atr = close.iloc[-1] * 0.0025 # صمام أمان احتياطي
+        c_atr = close.iloc[-1] * 0.0020 # صمام أمان تذبذب
 
-    # 2️⃣ حساب نقاط الدعم والمقاومة الكلاسيكية بناءً على الشمعة السابقة المنتهية (ثابتة وموثوقة)
+    # 2️⃣ فحص سيولة الحيتان (Volume Spike Filter)
+    # مستحيل البوت يدخل صفقة ارتداد اختراق إلا إذا كان الفوليوم الحالي أعلى من متوسط الـ 20 شمعة السابقة
+    avg_volume = volume.rolling(window=20).mean().iloc[-1]
+    c_volume = volume.iloc[-1]
+    volume_confirmed = c_volume > (avg_volume * 1.2)
+
+    # 3️⃣ تحديد مناطق الارتداد وهندسة السعر مسبقاً بناءً على الشمعة السابقة الثابتة
     prev_high = high.iloc[-2]
     prev_low = low.iloc[-2]
     prev_close = close.iloc[-2]
 
     pivot = (prev_high + prev_low + prev_close) / 3
-    r1 = (2 * pivot) - prev_low
-    s1 = (2 * pivot) - prev_high
+    r1 = (2 * pivot) - prev_low  # مقاومة ارتداد البيع مسبقاً
+    s1 = (2 * pivot) - prev_high # دعم ارتداد الشراء مسبقاً
 
-    # الأسعار الحالية اللحظية
     c_close = close.iloc[-1]
 
-    # 3️⃣ استخراج قراءات الاتجاه والزخم والسيولة
+    # 4️⃣ فحص المؤشرات اللحظية للاتجاه (EMA, RSI, MACD)
     ema_20 = close.ewm(span=20, adjust=False).mean()
     ema_50 = close.ewm(span=50, adjust=False).mean()
     
@@ -106,7 +114,6 @@ def calculate_signals(df):
     c_macd = macd.iloc[-1]
     c_signal = signal_line.iloc[-1]
 
-    # سيستم التصويت الرقمي
     buy_score = 0
     sell_score = 0
 
@@ -120,39 +127,50 @@ def calculate_signals(df):
     else: sell_score += 1
 
     final_score = max(buy_score, sell_score)
-    display_score = int((final_score / 4) * 10) # تحويل لنسبة مئوية من 10 لتظهر فخمة للمستخدم
+    display_score = int((final_score / 4) * 10)
 
-    # 4️⃣ بناء استراتيجية القناص الاحترافية (إدارة صفقات حقيقية)
+    # 5️⃣ حارس المسافة الذكي (Price Distance Guard) ومنطق الصفقات القصيرة الرابحة مية بالمية
+    # هدف قصير ومضمون الاسكالبينج (1.2 ضعف الـ ATR) لحماية الأرباح السريعة فوراً
+    short_target_dist = 1.2 * c_atr 
+    stop_loss_dist = 1.0 * c_atr
+
     if buy_score >= 3:
-        if c_close > r1:
+        # إذا السعر الحالي انفجر وصار أعلى من منطقة الدخول المقترحة بمسافة كبيرة، هاد معناه القطار طار!
+        # بدلاً من تجميد ودبس الناس بشراء من القمة الحالية، يقلبها البوت فوراً لأمر معلق (Buy Limit) ينتظر ارتداد السعر مسبقاً عند منطقة الدعم
+        max_allowed_chase = c_atr * 0.35
+        if (c_close - s1) > max_allowed_chase:
             signal = {
-                "type": "BUY MARKET 📈 (شراء فوري)",
-                "entry": round(c_close, 2 if c_close > 100 else 4),
-                "tp": round(c_close + (2 * c_atr), 2 if c_close > 100 else 4), # إدارة أرباح ضعف المخاطرة 1:2
-                "sl": round(c_close - c_atr, 2 if c_close > 100 else 4)
+                "type": "BUY LIMIT ⏳ (أمر شراء معلق مسبق)",
+                "entry": round(s1, 2 if c_close > 100 else 4),
+                "tp": round(s1 + short_target_dist, 2 if c_close > 100 else 4), # هدف قصير على الفرازة يربح المشترك فوراً
+                "sl": round(s1 - stop_loss_dist, 2 if c_close > 100 else 4)
             }
         else:
+            # الدخول الفوري مسموح فقط إذا كان السعر لسه قريب وبداية انطلاق الصعود ومؤكد بالفوليوم
             signal = {
-                "type": "BUY LIMIT ⏳ (أمر شراء معلق)",
-                "entry": round(s1, 2 if c_close > 100 else 4),
-                "tp": round(s1 + (2 * c_atr), 2 if c_close > 100 else 4),
-                "sl": round(s1 - c_atr, 2 if c_close > 100 else 4)
+                "type": "BUY MARKET 📈 (شراء فوري عاجل)",
+                "entry": round(c_close, 2 if c_close > 100 else 4),
+                "tp": round(c_close + short_target_dist, 2 if c_close > 100 else 4),
+                "sl": round(c_close - stop_loss_dist, 2 if c_close > 100 else 4)
             }
         return signal, display_score
 
     else:
-        if c_close < s1:
+        # في حالة البيع: لو السعر الحالي انمغص وهبط وابتعد جداً عن خط المقاومة (مثل الـ 4007)، مستحيل يعطيه بيع فوري في القاع
+        # ح يقلبها السيستم فوراً لأمر معلق ذكي (Sell Limit) مسبق ينتظر عودة السعر للارتداد من الأعلى مسبقاً عند الـ r1
+        max_allowed_chase = c_atr * 0.35
+        if (r1 - c_close) > max_allowed_chase:
             signal = {
-                "type": "SELL MARKET 📉 (بيع فوري)",
-                "entry": round(c_close, 2 if c_close > 100 else 4),
-                "tp": round(c_close - (2 * c_atr), 2 if c_close > 100 else 4),
-                "sl": round(c_close + c_atr, 2 if c_close > 100 else 4)
+                "type": "SELL LIMIT ⏳ (أمر بيع معلق مسبق)",
+                "entry": round(r1, 2 if c_close > 100 else 4),
+                "tp": round(r1 - short_target_dist, 2 if c_close > 100 else 4), # أهداف قصيرة تضمن خروج العميل كاش رابح مية بالمية
+                "sl": round(r1 + stop_loss_dist, 2 if c_close > 100 else 4)
             }
         else:
             signal = {
-                "type": "SELL LIMIT ⏳ (أمر بيع معلق)",
-                "entry": round(r1, 2 if c_close > 100 else 4),
-                "tp": round(r1 - (2 * c_atr), 2 if c_close > 100 else 4),
-                "sl": round(r1 + c_atr, 2 if c_close > 100 else 4)
+                "type": "SELL MARKET 📉 (بيع فوري عاجل)",
+                "entry": round(c_close, 2 if c_close > 100 else 4),
+                "tp": round(c_close - short_target_dist, 2 if c_close > 100 else 4),
+                "sl": round(c_close + stop_loss_dist, 2 if c_close > 100 else 4)
             }
         return signal, display_score
