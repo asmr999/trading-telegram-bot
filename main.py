@@ -276,9 +276,7 @@ if __name__ == '__main__':
     application.add_handler(CommandHandler("check", check_command))
     application.add_handler(CallbackQueryHandler(handle_callback_query))
     
-    # 📥 استيراد الفلاتر هان مباشرة عشان بايثون يشوفها فوراً
     from telegram.ext import MessageHandler, filters
-    
     application.add_handler(MessageHandler(filters.PHOTO, handle_chart_photo))
     
     print("Multi-Group Deep AI System is fully online. Ready.")
