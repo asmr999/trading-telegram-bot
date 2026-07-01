@@ -266,9 +266,9 @@ async def handle_chart_photo(update, context):
         
         await update.message.reply_text(analysis_text)
     except Exception as e:
-        await update.message.reply_text(f"❌ عذراً ليدر، حدث خطأ أثناء معالجة الصورة: {str(e)}")
-
-if __name__ == '__main__':
+        await update.message.reply_text(f"❌ عذراً ليدر، حدث خطأ أثناء معالجة الصورة: {str(e)}
+    
+    if __name__ == '__main__':
     TOKEN = os.environ.get("BOT_TOKEN", "8518436165:AAH2-DjOv0lh9EPpeatvKhAIX-1ODvvvIfY")
     application = Application.builder().token(TOKEN).post_init(post_init).build()
     
@@ -276,7 +276,9 @@ if __name__ == '__main__':
     application.add_handler(CommandHandler("check", check_command))
     application.add_handler(CallbackQueryHandler(handle_callback_query))
     
+    # 📥 السطر السحري اللي طار منك وأنت بتعدل فوق هيه رجعناه
     from telegram.ext import MessageHandler, filters
+    
     application.add_handler(MessageHandler(filters.PHOTO, handle_chart_photo))
     
     print("Multi-Group Deep AI System is fully online. Ready.")
