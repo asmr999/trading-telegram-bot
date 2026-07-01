@@ -10,14 +10,13 @@ application_global = None
 
 @app.route('/')
 def home(): 
-    return "Official High-Precision Multi-Group System with Webhooks is Active!"
+    return "Official High-Precision Multi-Group AI System is Active!"
 
 @app.route('/webhook', methods=['POST'])
 def tradingview_webhook():
     global application_global
     data = request.json
-    if not data or not application_global:
-        return jsonify({"status": "ignored", "reason": "no data or bot not ready"}), 400
+    if not data or not application_global: return jsonify({"status": "ignored"}), 400
         
     asset = data.get('asset', 'XAUUSD').upper()
     signal_type = data.get('type', 'BUY LIMIT ⏳')
@@ -25,20 +24,21 @@ def tradingview_webhook():
     tp = data.get('tp', '0.0')
     sl = data.get('sl', '0.0')
     
-    vip_text = f"🚨 *إشارة عاجلة مدعومة برادار الحيتان (TradingView)* 👑\n\n" \
-               f"📊 *الأصل المالي:* `{asset}`\n" \
-               f"⚙️ *نوع الأمر المكتشف:* {signal_type}\n" \
+    vip_text = f"🚨 إشارة عاجلة مدعومة برادار الحيتان (TradingView) 👑\n\n" \
+               f"📊 الأصل المالي: {asset}\n" \
+               f"⚙️ نوع الأمر المكتشف: {signal_type}\n" \
                f" ---------------------------------- \n" \
-               f"🟢 *سعر الدخول المؤسسي:* `{entry}`\n" \
-               f"🎯 *الهدف الخاطف (TP):* `{tp}`\n" \
-               f"🛑 *وقف الخسارة الآمن (SL):* `{sl}`\n\n" \
-               f"⚠️ *تم رصد منطقة الارتداد مسبقاً عبر نظام الـ Webhooks اللحظي!* 🔥"
+               f"🟢 سعر الدخول المؤسسي: `{entry}`\n" \
+               f"🎯 الهدف الخاطف (TP): `{tp}`\n" \
+               f"🛑 وقف الخسارة الآمن (SL): `{sl}`\n\n" \
+               f"🔗 كود وكالتنا المعتمد للحسابات القديمة: tr42sl0svg"
                
+    keyboard = [[InlineKeyboardButton("⚡ تداول الآن عبر JustMarkets", url="https://justmarkets.com/?ref=tr42sl0svg")]]
     asyncio.run_coroutine_threadsafe(
-        application_global.bot.send_message(chat_id=-1004372200363, text=vip_text, parse_mode="Markdown"),
+        application_global.bot.send_message(chat_id=-1004372200363, text=vip_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown"),
         application_global.loop
     )
-    return jsonify({"status": "success", "msg": "Signal injected to Telegram VIP Group!"}), 200
+    return jsonify({"status": "success"}), 200
 
 def run(): 
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
@@ -47,6 +47,7 @@ Thread(target=run, daemon=True).start()
 import config
 import database
 import analyzer
+import ai_analyst
 
 ADMIN_GROUP_ID = -1003310992331
 VIP_GROUP_ID = -1004372200363
@@ -54,39 +55,40 @@ VIP_GROUP_ID = -1004372200363
 PENDING_SIGNALS = {}
 SIGNAL_ID_COUNTER = 0
 FREE_TRIAL_COUNTER = {}
-GOLDEN_SIGNAL_TRACKER = {}  
 LAST_SENT_SIGNALS = {}  
 
 async def auto_signal_scheduler(application: Application):
     global SIGNAL_ID_COUNTER
-    print("... تم إطلاق رادار الفحص التلقائي الذكي للإدارة (مانع التكرار نشط) ...")
+    print("... تم إطلاق رادار الفحص التلقائي وجدار الـ AI الذكي (نشط) ...")
     await asyncio.sleep(10)
     while True:
         try:
             for asset in ["XAUUSD", "EURUSD", "BTCUSDT"]:
                 df = analyzer.get_live_data(asset, "30m")
-                signal, score = analyzer.calculate_signals(df, asset)
+                signal, score, summary = analyzer.calculate_signals(df, asset)
                 
                 if signal and score >= 8:
                     signal_fingerprint = f"{signal['type']}_{signal['entry']}"
-                    if LAST_SENT_SIGNALS.get(asset) == signal_fingerprint:
-                        continue
-                        
+                    if LAST_SENT_SIGNALS.get(asset) == signal_fingerprint: continue
                     LAST_SENT_SIGNALS[asset] = signal_fingerprint
+                    
+                    ai_msg = ai_analyst.ask_gemini_analyst(asset, signal['type'], signal['entry'], signal['tp1'], signal['tp2'], signal['sl'], signal['rr'], summary)
+                    
                     SIGNAL_ID_COUNTER += 1
                     PENDING_SIGNALS[SIGNAL_ID_COUNTER] = {
-                        "asset": asset, "type": signal['type'], "entry": signal['entry'], "tp": signal['tp'], "sl": signal['sl']
+                        "asset": asset, "type": signal['type'], "entry": signal['entry'], "tp1": signal['tp1'], "tp2": signal['tp2'], "sl": signal['sl'], "rr": signal['rr'], "ai_msg": ai_msg
                     }
                     
-                    admin_text = f"💎 *رادار الإدارة المباشر (فرصة جديدة فريدة)* 💎\n\n" \
-                                 f"📊 *الأصل المالي:* `{asset}`\n" \
-                                 f"⚙️ *نوع الإشارة:* {signal['type']}\n" \
-                                 f" ---------------------------------- \n" \
-                                 f"🟢 *سعر الدخول المقترح:* `{signal['entry']}`\n" \
-                                 f"🎯 *الهدف (TP):* `{signal['tp']}`\n" \
-                                 f"🛑 *وقف الخسارة (SL):* `{signal['sl']}`\n" \
-                                 f"⭐ *قوة دقة الفلتر الفني:* {score}/10\n\n" \
-                                 f"👇 اضغط على قرارك لحقن الصفقة رسمياً في جروب الـ VIP:"
+                    admin_text = f"💎 رادار الإدارة المباشر (تأكيد الذكاء الاصطناعي) 💎\n\n" \
+                                 f"📊 الأصل المالي: {asset}\n" \
+                                 f"⚙️ نوع الإشارة: {signal['type']}\n" \
+                                 f"🟢 سعر الدخول: `{signal['entry']}`\n" \
+                                 f"🎯 الهدف الأول: `{signal['tp1']}` | الهدف الثاني: `{signal['tp2']}`\n" \
+                                 f"🛑 وقف الخسارة: `{signal['sl']}`\n" \
+                                 f"⚖️ نسبة العائد/المخاطرة: {signal['rr']}\n" \
+                                 f"⭐ قوة الفلتر الرقمي: {score}/10\n\n" \
+                                 f"🧠 رؤية وحكم حارس الـ AI (جيمناي):\n{ai_msg}\n\n" \
+                                 f"👇 اضغط على قرارك لحقن الصفقة في الـ VIP الحين:"
                                  
                     keyboard = [[
                         InlineKeyboardButton("✅ موافقة ونشر بالـ VIP", callback_data=f"vip_pay_{SIGNAL_ID_COUNTER}"),
@@ -94,7 +96,7 @@ async def auto_signal_scheduler(application: Application):
                     ]]
                     await application.bot.send_message(chat_id=ADMIN_GROUP_ID, text=admin_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         except Exception as e:
-            print(f"خطأ في مجدول الإدارة: {e}")
+            print(f"خطأ في المجدول: {e}")
         await asyncio.sleep(300)
 
 async def post_init(application: Application):
@@ -107,45 +109,45 @@ async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     if chat_id != ADMIN_GROUP_ID: return 
     if not context.args:
-        await update.message.reply_text("⚠️ يرجى كتابة اسم الأصل المالي مع الأمر، مثال:\n`/check XAUUSD`")
+        await update.message.reply_text("⚠️ يرجى كتابة اسم الأصل المالي، مثال:\n`/check XAUUSD`")
         return
     asset = context.args[0].upper()
-    await update.message.reply_text(f"🚀 أمر فوري من اللّيدر! جاري فحص {asset} الحين بقوة الفلاتر المؤسسية ومواقع التحليل...")
+    await update.message.reply_text(f"🚀 أمر عاجل من اللّيدر! جاري فحص {asset} بـ 13 مؤشر رقمي وحارس الـ AI الحين...")
     
     try:
         df = analyzer.get_live_data(asset, "30m")
-        signal, score = analyzer.calculate_signals(df, asset)
+        signal, score, summary = analyzer.calculate_signals(df, asset)
         if signal:
+            ai_msg = ai_analyst.ask_gemini_analyst(asset, signal['type'], signal['entry'], signal['tp1'], signal['tp2'], signal['sl'], signal['rr'], summary)
             SIGNAL_ID_COUNTER += 1
             PENDING_SIGNALS[SIGNAL_ID_COUNTER] = {
-                "asset": asset, "type": signal['type'], "entry": signal['entry'], "tp": signal['tp'], "sl": signal['sl']
+                "asset": asset, "type": signal['type'], "entry": signal['entry'], "tp1": signal['tp1'], "tp2": signal['tp2'], "sl": signal['sl'], "rr": signal['rr'], "ai_msg": ai_msg
             }
-            admin_text = f"⚡ *تحليل فوري مستدعى بواسطة اللّيدر* ⚡\n\n" \
-                         f"📊 *الأصل المالي:* `{asset}`\n" \
-                         f"⚙️ *حالة الحركة:* {signal['type']}\n" \
-                         f"🟢 *سعر الدخول:* `{signal['entry']}`\n" \
-                         f"🎯 *الهدف (TP):* `{signal['tp']}`\n" \
-                         f"🛑 *وقف الخسارة (SL):* `{signal['sl']}`\n" \
-                         f"⭐ *دقة المطابقة الفنية والتحليلية:* {score}/10"
+            admin_text = f"⚡ تحليل فوري مستدعى بواسطة اللّيدر ⚡\n\n" \
+                         f"📊 الأصل المالي: {asset}\n" \
+                         f"⚙️ حالة الحركة: {signal['type']}\n" \
+                         f"🟢 سعر الدخول المكتشف: `{signal['entry']}`\n" \
+                         f"🎯 الأهداف: TP1=`{signal['tp1']}` | TP2=`{signal['tp2']}`\n" \
+                         f"🛑 وقف الخسارة (SL): `{signal['sl']}`\n" \
+                         f"⚖️ النسبة الحسابية (RR): {signal['rr']}\n" \
+                         f"⭐ دقة مطابقة الفلاتر: {score}/10\n\n" \
+                         f"🧠 رؤية وتفسير حارس الـ AI (جيمناي):\n{ai_msg}"
             keyboard = [[
                 InlineKeyboardButton("✅ موافقة ونشر بالـ VIP", callback_data=f"vip_pay_{SIGNAL_ID_COUNTER}"),
                 InlineKeyboardButton("❌ إلغاء الصفقة", callback_data=f"vip_rej_{SIGNAL_ID_COUNTER}")
             ]]
             await update.message.reply_text(admin_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         else:
-            await update.message.reply_text(f"❌ تم الفحص فوراً، ولكن لا توجد إشارة فنية مستقرة ومؤكدة لـ {asset} حالياً (أو خارج ساعات السيولة الرسمية للذهب).")
+            await update.message.reply_text(f"❌ تم الفحص، ولكن لا توجد إشارة مستقرة وقوية لـ {asset} حالياً (أو خارج ساعات السيولة الرسمية).")
     except Exception as e:
-        await update.message.reply_text(f"❌ حدث خطأ تقني أثناء سحب البيانات الفورية: {e}")
+        await update.message.reply_text(f"❌ حدث خطأ تقني في سحب الشموع: {e}")
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    try:
-        if hasattr(database, 'add_user'): database.add_user(user.id, user.username)
-    except: pass
     keyboard = [['📊 طلب صفقة مضاربة', '👑 مجاني VIP اشتراك'], ['📞 الدعم الفني']]
     await update.message.reply_text(
-        f"أهلاً بك يا {user.first_name} في نظام الرادار الآلي المطوّر 🚀\n\n"
-        f"🎁 حسابك مفعل تلقائياً للحصول على **(3 صفقات ناجحة يومياً)** فائدة الدقة لتجربة مصداقية السيستم بنفسك قبل الانتقال للـ VIP!", 
+        f"أهلاً بك يا {user.first_name} في نظام رادار الـ AI المطوّر لشركة الاستثمار الخاصة بنا 🚀\n\n"
+        f"🎁 رصيدك مفعل تلقائياً للحصول على (3 صفقات ناجحة يومياً) لتجربة مصداقية وحش الذكاء الاصطناعي بنفسك الحين قبل الانتقال للـ VIP!", 
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     )
 
@@ -154,62 +156,21 @@ async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     user_id = update.effective_user.id
     username = update.effective_user.username or "بدون معرف"
 
-    if context.user_data.get('awaiting_jm_id'):
-        context.user_data['awaiting_jm_id'] = False
-        if not text.isdigit():
-            await update.message.reply_text("⚠️ خطأ! أدخل أرقام حسابك المكون من أرقام فقط.")
-            return
-        try:
-            if hasattr(database, 'update_justmarkets_id'): database.update_justmarkets_id(user_id, text)
-        except: pass
-        await update.message.reply_text("🎉 تم رفع طلبك بنجاح! جاري تدقيقه من قبل الإدارة لتفعيل ميزات الـ VIP غير المحدودة.")
-        admin_alert = f"👤 **طلب توثيق عميل جديد**\n\n🔹 المشترك: @{username}\n🔹 الأي دي: {user_id}\n🔑 رقم حساب JustMarkets: {text}\n\nراجع لوحة الشركاء وفعل الحساب إذا كان تحت وكالتك بنجاح."
-        await context.bot.send_message(chat_id=ADMIN_GROUP_ID, text=admin_alert)
-        return
-
-    if context.user_data.get('awaiting_support'):
-        context.user_data['awaiting_support'] = False
-        await update.message.reply_text("✅ تم إرسال رسالتك لفريق الدعم الفني بنجاح، وسيتم الرد عليك في أقرب وقت يا غالي!")
-        support_alert = f"📞 **رسالة واردة للدعم الفني**\n\n👤 **من المشترك:** @{username}\n🆔 **الأي دي:** {user_id}\n\n💬 **نص الرسالة:**\n{text}"
-        await context.bot.send_message(chat_id=ADMIN_GROUP_ID, text=support_alert)
-        return
-
     if text == '📊 طلب صفقة مضاربة':
-        is_vip = False
-        try:
-            user_data = None
-            if hasattr(database, 'get_user'): user_data = database.get_user(user_id)
-            if user_data and isinstance(user_data, dict):
-                is_vip = bool(user_data.get('justmarkets_id'))
-        except: pass
-
-        if not is_vip:
-            current_count = FREE_TRIAL_COUNTER.get(user_id, 0)
-            if current_count >= 3:
-                await update.message.reply_text(
-                    "❌ **انتهت الفترة التجريبية المجانية الخاصة بك اليوم!**\n\n"
-                    "لأن صفقاتنا قيمتها عالية ومصفاة بدقة، نمنح 3 إشارات ناجحة فقط للزوار الجدد.\n"
-                    "لتفتح الصفقات مدى الحياة وبشكل غير محدود مجاناً، قم بفتح حساب عبر رابط وكالتنا الحين وضعه هنا 👇",
-                    reply_markup=ReplyKeyboardMarkup([['👑 مجاني VIP اشتراك']], resize_keyboard=True)
-                )
-                return
-
         keyboard = [
             [InlineKeyboardButton("🏆 ذهب (XAU/USD)", callback_data='asset_XAUUSD')],
             [InlineKeyboardButton("EUR/USD (فوركس)", callback_data='asset_EURUSD'), InlineKeyboardButton("BTC/USDT (كريبتو)", callback_data='asset_BTCUSDT')]
         ]
-        await update.message.reply_text("📊 إختر الأصل المالي المطلوب استخراج إشارته الحية الحين وبكل دقة:", reply_markup=InlineKeyboardMarkup(keyboard))
-        
+        await update.message.reply_text("📊 إختر الأصل المالي المطلوب استخراج إشارته الحية الحين بدقة الفلاتر الـ 13 وجيمناي ومجاناً:", reply_markup=InlineKeyboardMarkup(keyboard))
     elif text == '👑 مجاني VIP اشتراك':
         keyboard = [
-            [InlineKeyboardButton("🔗 1. فتح حساب في JustMarkets وبدء التداول", url=config.JUSTMARKETS_REF_LINK)],
-            [InlineKeyboardButton("📝 2. ربط وتوثيق رقم حسابك بالبوت", callback_data='register')]
+            [InlineKeyboardButton("🔗 1. فتح حساب في JustMarkets وبدء التداول", url="https://justmarkets.com/?ref=tr42sl0svg")],
+            [InlineKeyboardButton("📝 2. ربط رقم حسابك بالبوت الحين", callback_data='register')]
         ]
-        await update.message.reply_text("👇 للحصول على الخدمات والتحليلات داخل جروب الـ VIP بشكل دائم وغير محدود، اتبع الخطوات التالية:", reply_markup=InlineKeyboardMarkup(keyboard))
-
+        await update.message.reply_text(f"👇 للحصول على الخدمات والتحليلات مجاناً مدى الحياة داخل جروب الـ VIP، اتبع الخطوات التالية:\n\n🔑 كود وكالتنا اليدوي للحسابات القديمة: tr42sl0svg", reply_markup=InlineKeyboardMarkup(keyboard))
     elif text == '📞 الدعم الفني':
         context.user_data['awaiting_support'] = True
-        await update.message.reply_text("📩 أرسل رسالتك الحين وسيتم تحويلها مباشرة لجروب الإدارة لمتابعتك فوراً.")
+        await update.message.reply_text("📩 أرسل رسالتك الحين وسيتم تحويلها لجروب الإدارة لمتابعتك فوراً.")
 
 async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -219,35 +180,38 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
 
     if data == 'register':
         context.user_data['awaiting_jm_id'] = True
-        await query.message.reply_text("📝 أرسل الحين رقم حسابك (ID) المفتوح في JustMarkets المكون من أرقام فقط:")
+        await query.message.reply_text("📝 أرسل الحين رقم حسابك (ID) المفتوح تحت وكالتنا المكون من أرقام فقط:")
         return
 
     if data.startswith("vip_pay_"):
         sig_id = int(data.split("_")[2])
         sig = PENDING_SIGNALS.get(sig_id)
         if sig:
-            vip_text = f"🚨 *إشارة تداول رسمية معتمدة من الإدارة* 👑\n\n" \
-                       f"📊 *الأصل المالي:* `{sig['asset']}`\n" \
-                       f"⚙️ *نوع الأمر:* {sig['type']}\n" \
+            vip_text = f"🚨 إشارة تداول رسمية معتمدة على الفرازة 👑\n\n" \
+                       f"📊 الأصل المالي: {sig['asset']}\n" \
+                       f"⚙️ نوع الأمر: {sig['type']}\n" \
                        f" ---------------------------------- \n" \
-                       f"🟢 *سعر الدخول المعتمد:* `{sig['entry']}`\n" \
-                       f"🎯 *هدف جني الأرباح (TP):* `{sig['tp']}`\n" \
-                       f"🛑 *وقف الخسارة (SL):* `{sig['sl']}`\n\n" \
-                       f"⚠️ جروب الـ VIP الرسمي - تداولوا بحذر وإدارة رأس مال حكيمة! 🔥"
+                       f"🟢 سعر الدخول المعتمد: `{sig['entry']}`\n" \
+                       f"🎯 هدف أول خاطف: `{sig['tp1']}`\n" \
+                       f"🏆 هدف ثانٍ حوت: `{sig['tp2']}`\n" \
+                       f"🛑 وقف الخسارة آمن: `{sig['sl']}`\n" \
+                       f"⚖️ النسبة المحسوبة (RR): {sig['rr']}\n\n" \
+                       f"🧠 تحليل وتفسير وحش الـ AI (جيمناي):\n{sig['ai_msg']}\n\n" \
+                       f"⚠️ تداولوا بحذر وبإدارة صارمة لرأس المال! كود الشريك لربط الحسابات: tr42sl0svg"
+                       
+            keyboard = [[InlineKeyboardButton("⚡ تداول الآن عبر JustMarkets", url="https://justmarkets.com/?ref=tr42sl0svg")]]
             try:
-                await context.bot.send_message(chat_id=VIP_GROUP_ID, text=vip_text, parse_mode="Markdown")
-                await query.edit_message_text(f"✅ تم اعتماد الصفقة بنجاح ونشرها فوراً داخل جروب الـ VIP!")
+                await context.bot.send_message(chat_id=VIP_GROUP_ID, text=vip_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+                await query.edit_message_text(f"✅ تم اعتماد صفقة الـ AI بنجاح ونشرها بالأزرار التفاعلية الشفافة بالـ VIP!")
                 PENDING_SIGNALS.pop(sig_id, None)
             except Exception as e:
-                await query.edit_message_text(f"❌ تم الاعتماد ولكن فشل النشر الآلي. الخطأ: {e}")
-        else:
-            await query.edit_message_text("⚠️ هذه الصفقة تم معالجتها سابقاً أو انتهت صلاحيتها الفنية.")
+                await query.edit_message_text(f"❌ تم الاعتماد ولكن فشل النشر التلقائي: {e}")
         return
 
     if data.startswith("vip_rej_"):
         sig_id = int(data.split("_")[2])
         PENDING_SIGNALS.pop(sig_id, None)
-        await query.edit_message_text("❌ تم رفض هذه الإشارة واستبعادها بنجاح بواسطة اللّيدر.")
+        await query.edit_message_text("❌ تم رفض الإشارة واستبعادها بنجاح بواسطة اللّيدر.")
         return
 
     if data.startswith("asset_"):
@@ -262,57 +226,37 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         parts = data.split("_")
         asset, timeframe = parts[1], parts[2]
         
-        is_vip = False
-        try:
-            user_data = None
-            if hasattr(database, 'get_user'): user_data = database.get_user(user_id)
-            if user_data and isinstance(user_data, dict):
-                is_vip = bool(user_data.get('justmarkets_id'))
-        except: pass
-
-        if not is_vip and FREE_TRIAL_COUNTER.get(user_id, 0) >= 3:
-            await query.edit_message_text("❌ انتهى رصيد صفقاتك المجانية المتاحة لليوم! يرجى الترقية للـ VIP للاستمرار.")
-            return
-
-        await query.edit_message_text(f"🔍 الرادار الذكي يفحص ويحلل {asset} على فريم ({timeframe})... ثواني ⏳")
+        await query.edit_message_text(f"🔍 رادار الـ AI يغربل ويقنص {asset} على فريم ({timeframe}) مسبقاً الحين... ثواني ⏳")
         
         try:
             df = analyzer.get_live_data(asset, timeframe)
-            signal, score = analyzer.calculate_signals(df, asset)
+            signal, score, summary = analyzer.calculate_signals(df, asset)
             
             if signal:
-                if not is_vip:
-                    if score >= 9 and GOLDEN_SIGNAL_TRACKER.get(user_id, 0) == 0:
-                        GOLDEN_SIGNAL_TRACKER[user_id] = 1 
-                        remaining = 3 - FREE_TRIAL_COUNTER.get(user_id, 0)
-                        trial_footer = f"\n\n🎁 *[هدية ألماسيّة من اللّيدر]:* هذه الصفقة قوتها الفنية خارقة ({score}/10)، ولأنها فرصة نادرة تم إعطاؤها للجميع *مجاناً بالكامل دون خصم من رصيدك اليومي!* متبقي لك: ({remaining} من 3)."
-                    else:
-                        FREE_TRIAL_COUNTER[user_id] = FREE_TRIAL_COUNTER.get(user_id, 0) + 1
-                        remaining = 3 - FREE_TRIAL_COUNTER[user_id]
-                        if score >= 9:
-                            trial_footer = f"\n\n🎁 *[ملاحظة الرصيد]:* هذه الصفقة قوتها ({score}/10) ولكن نظراً للاستفادة السابقة من الهدية اليوم، تم احتسابها من رصيدك. متبقي لك: ({remaining} من 3)."
-                        else:
-                            trial_footer = f"\n\n🎁 *[ملاحظة الرصيد]:* تم احتساب صفقة حقيقية ناجحة. متبقي لك اليوم: ({remaining} من 3) صفقات مجانية."
-                else:
-                    trial_footer = ""
-
-                reply_text = f"🎯 *نتائج رادار التحليل الفني المصفّى (على الفرازة)* 🎯\n\n" \
-                             f"🔹 *الأصل:* `{asset}` | *الفريم:* {timeframe}\n" \
+                ai_explanation = ai_analyst.ask_gemini_analyst(asset, signal['type'], signal['entry'], signal['tp1'], signal['tp2'], signal['sl'], signal['rr'], summary)
+                reply_text = f"🎯 نتائج رادار الـ AI المصفّى (على الفرازة) 🎯\n\n" \
+                             f"🔹 الأصل: {asset} | الفريم: {timeframe}\n" \
                              f" ---------------------------------- \n" \
-                             f"📈 *الحالة الفنية للترند:* {signal['type']}\n" \
-                             f"🟢 *نقطة الدخول المقترحة:* `{signal['entry']}`\n" \
-                             f"🎯 *الهدف المحسوب (TP):* `{signal['tp']}`\n" \
-                             f"🛑 *وقف الخسارة (SL):* `{signal['sl']}`\n" \
-                             f"⭐ *قوة تأكيد الاستراتيجية الحالية:* {score}/10" + trial_footer
+                             f"📈 الحالة الفنية للترند: {signal['type']}\n" \
+                             f"🟢 نقطة الدخول المقترحة: `{signal['entry']}`\n" \
+                             f"🎯 هدف أول (خاطف): `{signal['tp1']}`\n" \
+                             f"🏆 هدف ثانٍ (حوت): `{signal['tp2']}`\n" \
+                             f"🛑 وقف الخسارة آمن: `{signal['sl']}`\n" \
+                             f"⚖️ نسبة العائد/المخاطرة: {signal['rr']}\n" \
+                             f"⭐ قوة تأكيد الاستراتيجية: {score}/10\n\n" \
+                             f"🧠 تحليل وتفسير وحش الـ AI (جيمناي):\n{ai_explanation}\n\n" \
+                             f"🔑 كود الشريك المعتمد لربط حسابك: tr42sl0svg"
+                             
+                keyboard = [[InlineKeyboardButton("⚡ تداول الآن عبر JustMarkets", url="https://justmarkets.com/?ref=tr42sl0svg")]]
+                await query.message.reply_text(reply_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
             else:
-                reply_text = f"❌ الرادار يفحص الأسواق الآن بدقة، ولكن لا توجد إشارة نقية 100% متطابقة لـ {asset} على فريم {timeframe} حالياً (أو خارج ساعات السيولة الرسمية للذهب).\n\n🛡️ *حفاظاً على أمان حسابك لم يتم توليد توصية ولم يتم خصم أي شيء من رصيدك اليومي المجاني.*"
-                
-            await query.message.reply_text(reply_text, parse_mode="Markdown")
+                reply_text = f"❌ الرادار يفحص الأسواق الآن بدقة الفلاتر الـ 13، ولكن لا توجد إشارة نقية ومطابقة 100% حالياً لـ {asset} على فريم {timeframe} (أو خارج ساعات السيولة الحوتية).\n\n🛡️ حفاظاً على أمان حسابك لم يتم توليد توصية."
+                await query.message.reply_text(reply_text, parse_mode="Markdown")
         except Exception as e:
-            await query.message.reply_text(f"❌ عذراً، حدثت مشكلة تقنية مؤقتة أثناء جلب الشموع الحية: {e}")
+            await query.message.reply_text(f"❌ عذراً، حدث خطأ فني مؤقت: {e}")
 
 if __name__ == '__main__':
-    TOKEN = "8518436165:AAH2-DjOv0lh9EPpeatvKhAIX-l0DvvvIfY"
+    TOKEN = os.environ.get("BOT_TOKEN", "8518436165:AAH2-DjOv0lh9EPpeatvKhAIX-l0DvvvIfY")
     application = Application.builder().token(TOKEN).post_init(post_init).build()
     
     application.add_handler(CommandHandler("start", start_command))
@@ -321,5 +265,5 @@ if __name__ == '__main__':
     from telegram.ext import filters
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_messages))
     
-    print("Multi-Group Protected System is fully online. Ready.")
+    print("Multi-Group Deep AI System is fully online. Ready.")
     application.run_polling()
