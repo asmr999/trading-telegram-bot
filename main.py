@@ -268,15 +268,15 @@ async def handle_chart_photo(update, context):
         await update.message.reply_text(f"❌ عذراً ليدر، حدث خطأ أثناء معالجة الصورة: {str(e)}")
 
 if __name__ == '__main__':
-    TOKEN = os.environ.get("BOT_TOKEN", "8518436165:AAH2-DjOv0lh9EPpeatvKhAIX-l0DvvvIfY")
-    application = Application.builder().token(TOKEN).post_init(post_init).
+    TOKEN = os.environ.get("BOT_TOKEN", "8518436165:AAH2-DjOv0lh9EPpeatvKhAIX-1ODvvvIfY")
+    application = Application.builder().token(TOKEN).post_init(post_init).build()
     
-
     application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(CommandHandler("check", check_command)) 
+    application.add_handler(CommandHandler("check", check_command))
     application.add_handler(CallbackQueryHandler(handle_callback_query))
-        from telegram.ext import MessageHandler, filters
+    
+    from telegram.ext import MessageHandler, filters
     application.add_handler(MessageHandler(filters.PHOTO, handle_chart_photo))
-
+    
     print("Multi-Group Deep AI System is fully online. Ready.")
     application.run_polling()
