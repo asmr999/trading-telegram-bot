@@ -38,3 +38,36 @@ def ask_gemini_analyst(asset, signal_type, entry, tp1, tp2, sl, rr, summary_data
     except Exception as e:
         print(f"🚨 خطأ اتصال جيمناي: {e}")
         return "تم الفحص والمطابقة بنجاح مع مناطق انعكاس الأسعار التاريخية واللحظية."
+        
+# 🔥 دالة وحش الـ AI الجديدة لقراءة وتحليل صور الشارتات
+def analyze_chart_image(image_bytes):
+    import io
+    from PIL import Image
+    
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        return "❌ خطأ: مفتاح الـ AI (GEMINI_API_KEY) غير مضبوط في السيرفر."
+    
+    try:
+        genai.configure(api_key=api_key)
+        # استخدام موديل جيميناي فلاش الخارق والطلقة في قراءة الصور
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        # تحويل بايتات الصورة القادمة من التيليجرام إلى صورة يفهمها الذكاء الاصطناعي
+        image = Image.open(io.BytesIO(image_bytes))
+        
+        prompt = (
+            "أنت الآن الحوت الخبير والمحلل الفني الأكبر لأسواق المال والذهب والفوركس. "
+            "أمامك لقطة شاشة لشارت تداول أرسلها أحد المشتركين، حللها بدقة ملوكية وعالية باللغة العربية:\n\n"
+            "1️⃣ حدد الاتجاه العام الحالي للسعر (صاعد، هابط، عرضي).\n"
+            "2️⃣ ارصد أي نماذج فنية واضحة (خطوط تريند، قنوات سعرية، دعوم ومقاومات، شموع انعكاسية، أو مناطق سيولة Order Blocks).\n"
+            "3️⃣ أعطِ تقييماً نهائياً وواضحاً للفرصة (ممتازة للشراء، ممتازة للبيع، أو للمراقبة والانتظار).\n"
+            "4️⃣ حدد نقاط الدخول التقريبية، الأهداف المتوقعة (TP)، ووقف الخسارة (SL) إن أمكن لحماية المحفظة.\n\n"
+            "اجعل أسلوبك حماسي، احترافي، ومباشر يمنح المتداول ثقة كاملة كأنك مستشاره الخاص!"
+        )
+        
+        response = model.generate_content([prompt, image])
+        return response.text
+    except Exception as e:
+        return f"❌ عذراً ليدر، حدث خطأ أثناء تحليل الصورة بالـ AI: {str(e)}"
+
