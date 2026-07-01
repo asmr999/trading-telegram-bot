@@ -254,11 +254,31 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
                 await query.message.reply_text(reply_text, parse_mode="Markdown")
         except Exception as e:
             await query.message.reply_text(f"❌ عذراً، حدث خطأ فني مؤقت: {e}")
+# 📸 دالة استقبال لقطات الشاشة وتحويلها لـ AI الحوت الهجين
+async def handle_chart_photo(update: Update, context):
+    # رسالة طمأنينة سريعة للمشترك تشعل الحماس
+    status_msg = await update.message.reply_text("🦅 أمر عاجل من اللّيدر! جاري فحص الشارت بالعين البصرية لـ AI الحوت... ثواني ملوكية!")
+    
+    try:
+        # لقط أعلى جودة للصورة أرسلها المستخدم
+        photo_file = await update.message.photo[-1].get_file()
+        # تحميل الصورة في الذاكرة كـ bytes
+        image_bytes = await photo_file.download_as_bytearray()
+        
+        # استدعاء دالة التحليل الذكي من الملف الأول
+        from ai_analyst import analyze_chart_image
+        analysis_text = analyze_chart_image(image_bytes)
+        
+        # إرسال التقرير الملوكي النهائي للعميل
+        await update.message.reply_text(analysis_text)
+    except Exception as e:
+        await update.message.reply_text(f"❌ عذراً ليدر، حدث خطأ أثناء معالجة الصورة: {str(e)}")
 
 if __name__ == '__main__':
     TOKEN = os.environ.get("BOT_TOKEN", "8518436165:AAH2-DjOv0lh9EPpeatvKhAIX-l0DvvvIfY")
     application = Application.builder().token(TOKEN).post_init(post_init).build()
-    
+    application.add_handler(MessageHandler(filters.PHOTO, handle_chart_photo))
+
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("check", check_command)) 
     application.add_handler(CallbackQueryHandler(handle_callback_query))
