@@ -252,8 +252,6 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             else:
                 reply_text = f"❌ الرادار يفحص الأسواق الآن بدقة الفلاتر الـ 13، ولكن لا توجد إشارة نقية ومطابقة 100% حالياً لـ {asset} على فريم {timeframe} (أو خارج ساعات السيولة الحوتية).\n\n🛡️ حفاظاً على أمان حسابك لم يتم توليد توصية."
                 await query.message.reply_text(reply_text, parse_mode="Markdown")
-    except Exception as e:
-        pass
             # 📸 دالة استقبال لقطات الشاشة وتحويلها لـ AI الحوت الهجين
 async def handle_chart_photo(update, context):
     status_msg = await update.message.reply_text("🦅 أمر عاجل من اللّيدر! جاري فحص الشارت بالعين البصرية لـ AI الحوت... ثواني ملوكية!")
