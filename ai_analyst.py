@@ -1,13 +1,11 @@
 import os
 import google.generativeai as genai
 
-# 🔐 الكود الحين صار يسحب المفتاح بأمان من سيرفر ريندر مباشرة بدون ما ينكشف في جيت هاب
+# سحب المفتاح السري بأمان من سيرفر ريندر
 GOOGLE_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 if GOOGLE_API_KEY:
     genai.configure(api_key=GOOGLE_API_KEY)
-else:
-    print("⚠️ تحذير أمني: لم يتم العثور على مفتاح GEMINI_API_KEY في إعدادات السيرفر!")
 
 def analyze_chart_image(image_bytes):
     """تحليل يدوي بالعين البصرية عند إرسال صورة شارت"""
@@ -17,16 +15,11 @@ def analyze_chart_image(image_bytes):
     )
     try:
         image_parts = [{"mime_type": "image/png", "data": bytes(image_bytes)}]
-        for model_name in ['gemini-1.5-flash', 'gemini-1.5-flash-latest']:
-            try:
-                model = genai.GenerativeModel(model_name)
-                response = model.generate_content([prompt, image_parts[0]])
-                return response.text
-            except Exception:
-                continue
-        return "❌ خطأ أمني: تعذر الاتصال بالـ AI، يرجى التحقق من متغيرات السيرفر السرية."
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content([prompt, image_parts[0]])
+        return response.text
     except Exception as e:
-        return f"❌ خطأ في معالجة داتا الصورة: {str(e)}"
+        return f"❌ خطأ جوجل في معالجة الصورة: {str(e)}"
 
 def analyze_market_data_text(indicators_text):
     """تحليل تلقائي للبيانات الحية الموردة من السيرفر بدون صور"""
@@ -37,11 +30,10 @@ def analyze_market_data_text(indicators_text):
         "متبوعاً بشرح عبقري ومختصر لسبب الدخول بناءً على تلك المؤشرات الفنية المرفقة. صغ الرد بأسلوب احترافي ملوكي وقوي جداً باللغة العربية.\n\n"
         f"المعطيات الفنية الحالية للسوق:\n{indicators_text}"
     )
-    for model_name in ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-pro']:
-        try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt)
-            return response.text
-        except Exception:
-            continue
-    return "❌ خطأ تفعيل: تعذر قراءة البيانات الفنية الرقمية، تأكد من إعدادات المفتاح السري في ريندر."
+    try:
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        # 🎯 هان السحر: ح يطبع لك في التيليجرام السبب الحقيقي من جوجل مباشرة عشان نحله بثانية!
+        return f"❌ رد سيرفر جوجل الصريح للخطأ: {str(e)}"
