@@ -7,30 +7,42 @@ genai.configure(api_key=GOOGLE_API_KEY)
 
 def analyze_chart_image(image_bytes):
     """تحليل يدوي بالعين البصرية عند إرسال صورة شارت"""
+    prompt = (
+        "أنت المحلل الفني الخبير وحش الأسواق الملوكية. حلل هذا الشارت المرفق (ذهب، عملات، أو مؤشرات) "
+        "وأعطني اتجاه السيولة، ومناطق الدعم والمقاومة الحالية، ونقاط الدخول المقترحة للاستراتيجية بشكل دقيق ومختصر."
+    )
     try:
         image_parts = [{"mime_type": "image/png", "data": bytes(image_bytes)}]
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        prompt = (
-            "أنت المحلل الفني الخبير وحش الأسواق الملوكية. حلل هذا الشارت المرفق (ذهب، عملات، أو مؤشرات) "
-            "وأعطني اتجاه السيولة، ومناطق الدعم والمقاومة الحالية، ونقاط الدخول المقترحة للاستراتيجية بشكل دقيق ومختصر."
-        )
-        response = model.generate_content([prompt, image_parts[0]])
-        return response.text
+        
+        # تجربة الموديلات بالترتيب لضمان التوافق التام مع السيرفر
+        for model_name in ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-pro-vision']:
+            try:
+                model = genai.GenerativeModel(model_name)
+                response = model.generate_content([prompt, image_parts[0]])
+                return response.text
+            except Exception:
+                continue
+        return "❌ خطأ: تعذر الوصول إلى أي نموذج ذكاء اصطناعي صالح لمعالجة الصور."
     except Exception as e:
-        return f"❌ خطأ في تحليل الصورة: {str(e)}"
+        return f"❌ خطأ في معالجة داتا الصورة: {str(e)}"
 
 def analyze_market_data_text(indicators_text):
     """تحليل تلقائي موسع للبيانات الحية الموردة من السيرفر بدون صور"""
-    try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        prompt = (
-            "أنت المستشار المالي والوحش الخبير في قراءة حركة تدفق السيولة للذهب والعملات العالمية.\n"
-            "أمامك تقرير فني حي ومفصل للمؤشرات الفنية الحالية للسوق. ادرس هذه المعطيات الرقمية بدقة، "
-            "ثم قم بصياغة صفقة تداول ملوكية متكاملة ومحددة تماماً (اتجاه الصفقة بيع/شراء، سعر الدخول المقترح، الأهداف الحتمية، وقف الخسارة الصارم)، "
-            "متبوعاً بشرح عبقري ومختصر لسبب الدخول بناءً على تلك المؤشرات الفنية المرفقة. صغ الرد بأسلوب احترافي ملوكي وقوي جداً باللغة العربية.\n\n"
-            f"المعطيات الفنية الحالية للسوق:\n{indicators_text}"
-        )
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        return f"❌ خطأ في معالجة البيانات الفنية: {str(e)}"
+    prompt = (
+        "أنت المستشار المالي والوحش الخبير في قراءة حركة تدفق السيولة للذهب والعملات العالمية.\n"
+        "أمامك تقرير فني حي ومفصل للمؤشرات الفنية الحالية للسوق. ادرس هذه المعطيات الرقمية بدقة، "
+        "ثم قم بصياغة صفقة تداول ملوكية متكاملة ومحددة تماماً (اتجاه الصفقة بيع/شراء، سعر الدخول المقترح، الأهداف الحتمية، وقف الخسارة الصارم)، "
+        "متبوعاً بشرح عبقري ومختصر لسبب الدخول بناءً على تلك المؤشرات الفنية M1 المرفقة. صغ الرد بأسلوب احترافي ملوكي وقوي جداً باللغة العربية.\n\n"
+        f"المعطيات الفنية الحالية للسوق:\n{indicators_text}"
+    )
+    
+    # 🎯 السحر هان: تجربة كافة قوالب الموديلات المتاحة لتخطي خطأ الـ 404 كلياً
+    for model_name in ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-pro']:
+        try:
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt)
+            return response.text
+        except Exception:
+            continue
+            
+    return "❌ خطأ: تعذر الوصول إلى أي نموذج ذكاء اصطناعي صالح لمعالجة البيانات النصية."
