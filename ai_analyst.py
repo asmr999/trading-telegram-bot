@@ -6,6 +6,9 @@ GOOGLE_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyD-YOUR-ACTUAL-KEY")
 genai.configure(api_key=GOOGLE_API_KEY)
 
 def analyze_chart_image(image_bytes):
+    """
+    دالة تحليل الشارت البصري المستدعاة بدقة في ملف main.py
+    """
     try:
         # تحضير داتا الصورة بشكل متوافق مع بايثون
         image_parts = [
@@ -15,7 +18,7 @@ def analyze_chart_image(image_bytes):
             }
         ]
         
-        # 🎯 استخدام الاسم الصافي والمعتمد لتجنب خطأ الـ 404 كلياً
+        # استخدام الاسم الصافي والمعتمد لتجنب الأخطاء
         model = genai.GenerativeModel('gemini-1.5-flash')
         
         prompt = (
@@ -27,7 +30,6 @@ def analyze_chart_image(image_bytes):
         return response.text
         
     except Exception as e:
-        # محاولة بديلة باسم الموديل المحدث في حال اختلاف نسخة المكتبة
         try:
             model = genai.GenerativeModel('gemini-1.5-flash-latest')
             response = model.generate_content([prompt, image_parts[0]])
