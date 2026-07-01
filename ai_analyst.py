@@ -8,10 +8,10 @@ SAMBANOVA_API_KEY = os.environ.get("SAMBANOVA_API_KEY")
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 COHERE_API_KEY = os.environ.get("COHERE_API_KEY")
 
-# 🎭 الميثاق المؤسسي الحصار لحجب الهوية
+# 🎭 الميثاق المؤسسي الصارم لحجب الهوية
 INSTITUTIONAL_PROMPT = (
     "أنت رئيس اللجنة الفنية العليا لإدارة المخاطر بصندوق SmartEntry الاستثماري العالمي.\n"
-    "يُمنع منعاً باتاً ذكر أنك ذكاء اصطناعي أو الإشارة لأسماء شركات التكنولوجيا.\n"
+    "يُمنع منعاً باتاً ذكر أنك ذكاء اصطناعي أو الإشارة لأسماء شركات التكنولوجيا نهائياً.\n"
     "حلل المعطيات المرفقة بدقة وجفاف رياضي وصغ التقرير بصيغة بشرية رسمية كالتالي:\n"
     "1. اتجاه السيولة الحالي الحين (شراء / بيع / انتظار).\n"
     "2. نقاط التنفيذ الفورية (سعر دخول دقيق، 3 أهداف حتمية، وقف خسارة صارم يضمن إدارة مخاطر 1:2).\n"
@@ -33,7 +33,6 @@ def fetch_model_stance_and_text(provider, url, headers, payload, response_type="
     return None, None
 
 def analyze_market_data_text(indicators_text):
-    """تحليل الداتا النصية الحية الحين عبر التصويت بالأغلبية"""
     votes = {"BUY": 0, "SELL": 0, "HOLD": 0}
     collected_reports = []
     full_prompt = f"{INSTITUTIONAL_PROMPT}\n\nأسعار البورصة الحية الحين:\n{indicators_text}"
@@ -78,17 +77,18 @@ def analyze_market_data_text(indicators_text):
     )
 
 def analyze_chart_image(image_bytes):
-    """👁️ التحليل البصري المباشر 100%: قراءة صورة الشارت وإصدار التقرير والصفقة فوراً وبدون وسيط نصي!"""
+    """👁️ الرادار التشخيصي: تحليل الشارت أو فضح كود الخطأ الصادر من السيرفر فوراً"""
     image_base64 = base64.b64encode(image_bytes).decode('utf-8')
     
-    # صياغة الأمر البصري المباشر والمشدد لاستخراج صفقة حقيقية من الشارت نفسه
     vision_prompt = (
         f"{INSTITUTIONAL_PROMPT}\n\n"
         "أمامك الآن صورة شارت حية وحقيقية من شاشة المتداول. انظر بعينك البصرية بدقة للشموع اليابانية، "
         "والاتجاه الحالي، وخطوط الدعم والمقاومة المرسومة، واستخرج الصفقة الفورية الصافية الحين بدون أي لف أو دوران وبأعلى دقة فنية."
     )
 
-    # 1️⃣ المحرك البصري الأول المباشر: Groq Vision
+    errors_log = []
+
+    # 1️⃣ تجربة المحرك الأول: Groq Vision
     if GROQ_API_KEY:
         try:
             url = "https://api.groq.com/openai/v1/chat/completions"
@@ -107,9 +107,14 @@ def analyze_chart_image(image_bytes):
             if res.status_code == 200:
                 report = res.json()['choices'][0]['message']['content']
                 return f"👑 **SmartEntry Global | وحدة التحليل البصري المباشر (الأساسي)** 👑\n\n" + report.replace("Groq", "").replace("Llama", "")
-        except Exception: pass
+            else:
+                errors_log.append(f"Groq_Error_Code_{res.status_code}: {res.text[:120]}")
+        except Exception as e:
+            errors_log.append(f"Groq_Crash: {str(e)[:60]}")
+    else:
+        errors_log.append("Groq_Key_Missing")
 
-    # 2️⃣ المحرك البصري الاحتياطي المباشر: OpenRouter Vision
+    # 2️⃣ تجربة خط الدفاع الثاني: OpenRouter Vision
     if OPENROUTER_API_KEY:
         try:
             url = "https://openrouter.ai/api/v1/chat/completions"
@@ -132,6 +137,18 @@ def analyze_chart_image(image_bytes):
             if res.status_code == 200:
                 report = res.json()['choices'][0]['message']['content']
                 return f"👑 **SmartEntry Global | وحدة التحليل البصري المباشر (الاحتياطي)** 👑\n\n" + report.replace("Groq", "").replace("Llama", "")
-        except Exception: pass
+            else:
+                errors_log.append(f"OpenRouter_Error_Code_{res.status_code}: {res.text[:120]}")
+        except Exception as e:
+            errors_log.append(f"OpenRouter_Crash: {str(e)[:60]}")
+    else:
+        errors_log.append("OpenRouter_Key_Missing")
 
-    return "❌ **تنبيه أمني:** لم تتمكن محركات الرؤية المباشرة من فك رموز الصورة الحين. يرجى التأكد من صلاحية المفاتيح المجانية في سيرفر ريندر."
+    # 🚨 طباعة التقرير الفضي التشخيصي دغري في الشات لإنهاء الغموض
+    all_errors = " | ".join(errors_log)
+    return (
+        f"❌ **فشل أمني في غرفة المقاصة البصرية**\n"
+        f"🔍 **السبب الحقيقي الصادر من السيرفرات الحين:**\n"
+        f"`[{all_errors}]`\n\n"
+        f"💡 *إجراء دغري:* انسخ هاد السطر أو خذ لقطة شاشة له لنعرف إذا المشكلة من حجم الصورة مالت الآيفون الكبيرة، أو السيرفر المجاني مضغوط، ونحلها فوراً!"
+    )
