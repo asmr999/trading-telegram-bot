@@ -1,35 +1,59 @@
 import os
-import google.generativeai as genai
+import base64
+import requests
 
-# سحب المفتاح السري بأمان من سيرفر ريندر
+# سحب المفتاح السري بأمان من خزنة سيرفر ريندر
 GOOGLE_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-if GOOGLE_API_KEY:
-    genai.configure(api_key=GOOGLE_API_KEY)
-
 def analyze_chart_image(image_bytes):
-    """تحليل يدوي بالعين البصرية عند إرسال صورة شارت"""
+    """تحليل الشارت البصري بطلب HTTP مباشر لتفادي تعارض المكتبات"""
+    if not GOOGLE_API_KEY:
+        return "❌ خطأ أمني: مفتاح GEMINI_API_KEY غير موجود في إعدادات ريندر السرّية."
+    
     prompt = (
         "أنت المحلل الفني الخبير وحش الأسواق الملوكية. حلل هذا الشارت المرفق (ذهب، عملات، أو مؤشرات) "
-        "وأعطني اتجاه السيولة، ومناطق الدعم والمقاومة الحالية، ونقاط الدخول المقترحة للاستراتيجية بشكل دقيق ومختصر."
+        "وأعطني اتجاه السيولة، ومناغم الدعم والمقاومة الحالية، ونقاط الدخول المقترحة للاستراتيجية بشكل دقيق ومختصر."
     )
-    errors = []
+    
     try:
-        image_parts = [{"mime_type": "image/png", "data": bytes(image_bytes)}]
-        for model_name in ['gemini-1.5-flash', 'gemini-pro-vision']:
-            try:
-                model = genai.GenerativeModel(model_name)
-                response = model.generate_content([prompt, image_parts[0]])
-                return response.text
-            except Exception as e:
-                errors.append(f"{model_name}: {str(e)}")
-                continue
-        return f"❌ أخطاء صور جوجل:\n" + "\n".join(errors)
+        # تحويل داتا الصورة إلى صيغة Base64 المتوافقة مع سيرفر جوجل مباشرة
+        image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+        
+        # رابط جوجل الرسمي والمباشر للموديل
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GOOGLE_API_KEY}"
+        
+        headers = {'Content-Type': 'application/json'}
+        payload = {
+            "contents": [{
+                "parts": [
+                    {"text": prompt},
+                    {
+                        "inlineData": {
+                            "mimeType": "image/png",
+                            "data": image_base64
+                        }
+                    }
+                ]
+            }]
+        }
+        
+        response = requests.post(url, headers=headers, json=payload)
+        response_data = response.json()
+        
+        if response.status_code == 200:
+            return response_data['candidates'][0]['content']['parts'][0]['text']
+        else:
+            error_msg = response_data.get('error', {}).get('message', 'خطأ غير معروف في خوادم جوجل')
+            return f"❌ خطأ سيرفر جوجل المباشر: {error_msg}"
+            
     except Exception as e:
         return f"❌ خطأ عام في معالجة الصورة: {str(e)}"
 
 def analyze_market_data_text(indicators_text):
-    """تحليل تلقائي للبيانات الحية الموردة من السيرفر بدون صور"""
+    """تحليل البيانات الرقمية الحية بطلب HTTP مباشر صافي 100%"""
+    if not GOOGLE_API_KEY:
+        return "❌ خطأ أمني: مفتاح GEMINI_API_KEY غير موجود في إعدادات ريندر السرّية."
+        
     prompt = (
         "أنت المستشار المالي والوحش الخبير في قراءة حركة تدفق السيولة للذهب والعملات العالمية.\n"
         "أمامك تقرير فني حي ومفصل للمؤشرات الفنية الحالية للسوق. ادرس هذه المعطيات الرقمية بدقة، "
@@ -38,15 +62,25 @@ def analyze_market_data_text(indicators_text):
         f"المعطيات الفنية الحالية للسوق:\n{indicators_text}"
     )
     
-    errors = []
-    # 🎯 نجمع الأخطاء الحقيقية لكل الموديلات عشان نقفش العلة فوراً على الشات
-    for model_name in ['gemini-1.5-flash', 'gemini-pro', 'models/gemini-1.5-flash']:
-        try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt)
-            return response.text
-        except Exception as e:
-            errors.append(f"- {model_name} -> {str(e)}")
-            continue
+    try:
+        # ضرب السيرفر مباشرة بالموديل المستقر المستضيف
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GOOGLE_API_KEY}"
+        
+        headers = {'Content-Type': 'application/json'}
+        payload = {
+            "contents": [{
+                "parts": [{"text": prompt}]
+            }]
+        }
+        
+        response = requests.post(url, headers=headers, json=payload)
+        response_data = response.json()
+        
+        if response.status_code == 200:
+            return response_data['candidates'][0]['content']['parts'][0]['text']
+        else:
+            error_msg = response_data.get('error', {}).get('message', 'خطأ غير معروف في خوادم جوجل')
+            return f"❌ خطأ سيرفر جوجل المباشر: {error_msg}"
             
-    return f"❌ تقرير أخطاء سيرفر جوجل الصريح حالياً:\n" + "\n".join(errors)
+    except Exception as e:
+        return f"❌ خطأ عام في معالجة البيانات: {str(e)}"
