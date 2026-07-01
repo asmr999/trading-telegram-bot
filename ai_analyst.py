@@ -1,73 +1,36 @@
 import os
 import google.generativeai as genai
 
-def ask_gemini_analyst(asset, signal_type, entry, tp1, tp2, sl, rr, summary_data):
-    """
-    🔮 المحلل الهجين المساعد (AI Co-Analyst)
-    يتصل مباشرة باشتراك جيمناي الخاص بك لصياغة رؤية السوق التنبؤية بالكامل وبمظهر ملوكي
-    """
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        return "تم الفحص والاعتماد بناءً على استراتيجية الـ 13 مؤشر الحوت الرقمية المصمتة بنجاح."
+# إعداد مفتاح الـ API الخاص بجوجل من السيرفر
+GOOGLE_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyD-YOUR-ACTUAL-KEY")
+genai.configure(api_key=GOOGLE_API_KEY)
 
-    try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        
-        prompt = f"""
-        بصفتك خبير التداول المالي الكمي وإدارة المخاطر (Quant AI)، قم بتقييم وتفسير هذه الفرصة المصفاة:
-        الأصل المالي: {asset}
-        نوع الحركة: {signal_type}
-        سعر الدخول: {entry}
-        الأهداف: TP1={tp1} | TP2={tp2}
-        وقف الخسارة: SL={sl}
-        نسبة العائد للمخاطرة: {rr}
-        
-        ملخص حركة المؤشرات اللحظية:
-        {summary_data}
-        
-        المطلب منك بدقة للحفاظ على مظهر القناة الاستثماري الفخم:
-        1. أعط تقييمًا مباشرًا وقصيرًا جدًا (في سطر واحد صريح) حول منطقية هذا الارتداد وقوته الحالية.
-        2. اكتب فقرة من جملتين تشرح للمشتركين بلغة عربية قوية ومحترفة كيف تداخلت السيولة لتصنع هذا الصعود البسيط أو الارتداد القادم.
-        3. اختم بنصيحة لإدارة رأس المال وتأمين الأرباح عند الهدف الأول.
-        
-        تنبيه صارم: لا تضع أي مقدمات روتينية، ولا تكرر أرقام الأهداف مجددًا في نصك، واجعل الكلام منسقًا ومنظمًا ومباشرًا.
-        """
-        response = model.generate_content(prompt)
-        return response.text.strip() if response.text else "معتمد ومطابق لتدفق سيولة الحيتان الآن."
-    except Exception as e:
-        print(f"🚨 خطأ اتصال جيمناي: {e}")
-        return "تم الفحص والمطابقة بنجاح مع مناطق انعكاس الأسعار التاريخية واللحظية."
-        
-# 🔥 دالة وحش الـ AI الجديدة لقراءة وتحليل صور الشارتات
 def analyze_chart_image(image_bytes):
-    import io
-    from PIL import Image
-    
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        return "❌ خطأ: مفتاح الـ AI (GEMINI_API_KEY) غير مضبوط في السيرفر."
-    
     try:
-        genai.configure(api_key=api_key)
-        # استخدام موديل جيميناي فلاش الخارق والطلقة في قراءة الصور
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # تحضير داتا الصورة بشكل متوافق مع بايثون
+        image_parts = [
+            {
+                "mime_type": "image/png",
+                "data": bytes(image_bytes)
+            }
+        ]
         
-        # تحويل بايتات الصورة القادمة من التيليجرام إلى صورة يفهمها الذكاء الاصطناعي
-        image = Image.open(io.BytesIO(image_bytes))
+        # 🎯 استخدام الاسم الصافي والمعتمد لتجنب خطأ الـ 404 كلياً
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
         prompt = (
-            "أنت الآن الحوت الخبير والمحلل الفني الأكبر لأسواق المال والذهب والفوركس. "
-            "أمامك لقطة شاشة لشارت تداول أرسلها أحد المشتركين، حللها بدقة ملوكية وعالية باللغة العربية:\n\n"
-            "1️⃣ حدد الاتجاه العام الحالي للسعر (صاعد، هابط، عرضي).\n"
-            "2️⃣ ارصد أي نماذج فنية واضحة (خطوط تريند، قنوات سعرية، دعوم ومقاومات، شموع انعكاسية، أو مناطق سيولة Order Blocks).\n"
-            "3️⃣ أعطِ تقييماً نهائياً وواضحاً للفرصة (ممتازة للشراء، ممتازة للبيع، أو للمراقبة والانتظار).\n"
-            "4️⃣ حدد نقاط الدخول التقريبية، الأهداف المتوقعة (TP)، ووقف الخسارة (SL) إن أمكن لحماية المحفظة.\n\n"
-            "اجعل أسلوبك حماسي، احترافي، ومباشر يمنح المتداول ثقة كاملة كأنك مستشاره الخاص!"
+            "أنت المحلل الفني الخبير وحش الأسواق الملوكية. حلل هذا الشارت المرفق (ذهب، عملات، أو مؤشرات) "
+            "وأعطني اتجاه السيولة، ومناطق الدعم والمقاومة الحالية، ونقاط الدخول المقترحة للاستراتيجية بشكل دقيق ومختصر."
         )
         
-        response = model.generate_content([prompt, image])
+        response = model.generate_content([prompt, image_parts[0]])
         return response.text
+        
     except Exception as e:
-        return f"❌ عذراً ليدر، حدث خطأ أثناء تحليل الصورة بالـ AI: {str(e)}"
-
+        # محاولة بديلة باسم الموديل المحدث في حال اختلاف نسخة المكتبة
+        try:
+            model = genai.GenerativeModel('gemini-1.5-flash-latest')
+            response = model.generate_content([prompt, image_parts[0]])
+            return response.text
+        except Exception as inner_e:
+            return f"❌ خطأ في الاتصال بالذكاء الاصطناعي: {str(inner_e)}"
