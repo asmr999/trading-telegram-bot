@@ -55,6 +55,24 @@ def _macd(values):
     return round(macd_line[-1], 4), round(signal_line[-1], 4), round(histogram, 4)
 
 
+def map_symbol_to_keyword(raw_text):
+    """
+    يحاول يطابق اسم أداة مقروء من صورة شارت (مثل 'XAUUSD' أو 'Gold Spot')
+    مع مفتاح معروف عندنا بجدول ASSET_MAP. يرجع None لو ما قدر يتأكد،
+    عشان ما نربط تحليل بأداة غلط.
+    """
+    if not raw_text:
+        return None
+    t = raw_text.upper().replace(" ", "").replace("/", "").replace("-", "")
+    if "XAU" in t or "GOLD" in t:
+        return "xau"
+    if "BTC" in t or "BITCOIN" in t:
+        return "btc"
+    if "EUR" in t and "USD" in t:
+        return "eur"
+    return None
+
+
 def fetch_and_compute(asset_keyword="xau"):
     """
     يرجع (indicators_dict, error_message).
