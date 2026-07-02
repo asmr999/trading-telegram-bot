@@ -2,20 +2,33 @@ import os
 import base64
 import requests
 
-# 🔐 خزنة المفاتيح الحرة
+# 🔐 خزنة المفاتيح الحرة والمؤمنة لعام 2026
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 SAMBANOVA_API_KEY = os.environ.get("SAMBANOVA_API_KEY")
 COHERE_API_KEY = os.environ.get("COHERE_API_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 
-# 🎭 الميثاق المؤسسي الصارم لحجب الهوية
+# 🎭 ميثاق الاختصار الصارم لمنع الحشو وطباعة الصافي الفوري الحين
 INSTITUTIONAL_PROMPT = (
-    "أنت رئيس اللجنة الفنية العليا لإدارة المخاطر بصندوق SmartEntry الاستثماري العالمي.\n"
-    "يُمنع منعاً باتاً ذكر أنك ذكاء اصطناعي أو الإشارة لأسماء شركات التكنولوجيا نهائياً.\n"
-    "حلل المعطيات المرفقة بدقة وجفاف رياضي وصغ التقرير بصيغة بشرية رسمية كالتالي:\n"
-    "1. اتجاه السيولة الحالي الحين (شراء / بيع / انتظار).\n"
-    "2. نقاط التنفيذ الفورية (سعر دخول دقيق، 3 أهداف حتمية، وقف خسارة صارم يضمن إدارة مخاطر 1:2).\n"
-    "3. التبرير الهيكلي للحركة بناءً على أحزمة السيولة الحالية الحية بالسوق."
+    "أنت رئيس اللجنة الفنية العليا لإدارة السيولة بصندوق SmartEntry العالمي.\n"
+    "يُمنع منعاً باتاً كتابة أي مقدمات أو فقرات إنشائية أو الإشارة لشركات الذكاء الاصطناعي.\n"
+    "صغ التقرير في نقاط جافة ومباشرة للمتداول الحين كالتالي حصراً:\n"
+    "1. نوع الأداة والفريم المكتشف (مثال: الذهب XAUUSD | فريم 15 دقيقة).\n"
+    "2. اتجاه الحركة اللحظي (شراء BUY أو بيع SELL أو انتظار HOLD).\n"
+    "3. نقطة الدخول الصافية (Entry Price).\n"
+    "4. جني الأرباح التصاعدي: الهدف 1، الهدف 2، الهدف 3.\n"
+    "5. وقف الخسارة الصارم (Stop Loss).\n"
+    "6. قاعدة أمان إدارة الصفقة: (عند ضرب الهدف الأول، يتم نقل وقف الخسارة فوراً إلى نقطة الدخول لتأمين الصفقة الحين كلياً)."
+)
+
+# 🔥 حقن رابط وكالتك الحقيقي والـ Partner Code مالتك بالملّي الحين لضمان العمولات دغري
+AGENCY_SIGNATURE = (
+    "\n━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    "👑 **صادر برعاية المحفظة المؤسسية الكبرى** 👑\n"
+    "💼 **وكالة جَست مارتنك العالمية | Just Martink Agency**\n"
+    "🔗 **رابط التسجيل والوكالة مالتنا الحين:** https://one.justmarkets.link/a/tr42sl0svg\n"
+    "🔑 **Partner Code:** `tr42sl0svg`"
 )
 
 def fetch_model_stance_and_text(provider, url, headers, payload, response_type="openai"):
@@ -49,10 +62,9 @@ def analyze_market_data_text(indicators_text):
         if s: votes[s] += 1; collected_reports.append(t)
 
     if not collected_reports:
-        return "⚠️ **[تنبيه]:** خوادم الفرز النصي ممتلئة حالياً الحين، يرجى إعادة طلب الأمر."
+        return "⚠️ **[تنبيه]:** خوادم الفرز ممتلئة حالياً الحين، يرجى إعادة طلب الأمر."
 
     final_decision = max(votes, key=votes.get)
-    total_active_votes = sum(votes.values())
     best_report = collected_reports[0]
     for report in collected_reports:
         if final_decision == "BUY" and ("شراء" in report or "هدف" in report):
@@ -63,28 +75,28 @@ def analyze_market_data_text(indicators_text):
             break
 
     clean_report = best_report.replace("Groq", "").replace("OpenAI", "").replace("Gemini", "").replace("ChatGPT", "").replace("Llama", "")
-    return (
-        f"👑 **SmartEntry Global | قسم المقاصة الرقمية** 👑\n"
-        f"📋 **التقرير الفني المشترك الصادر الحين**\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🗳️ *تصويت خبراء الصندوق الحين:* (شراء: {votes['BUY']} | بيع: {votes['SELL']} | انتظار: {votes['HOLD']}) بنسبة حسم: {int((votes[final_decision]/total_active_votes)*100)}%\n\n"
-        f"{clean_report}"
-    )
+    return clean_report + AGENCY_SIGNATURE
 
 def analyze_chart_image(image_bytes):
-    """👁️ دالة الرؤية المعصومة: شلال تلقائي يحرق أخطاء التايم أوت كلياً للأبد"""
+    """👁️ العين البصرية الجبارة: تحليل الفريم وأعمدة الفوليوم لعام 2026 مع شلال طوارئ تلقائي"""
     image_base64 = base64.b64encode(image_bytes).decode('utf-8')
     
     vision_prompt = (
-        "You are the Head of Technical Analysis at SmartEntry Global Fund. Look carefully at this screenshot image of a financial chart from the user's mobile.\n"
-        "Analyze the candlestick pattern, the support/resistance zones, and the current exact market price visible on the right axis.\n"
-        "Formulate a highly accurate trading signal in Arabic with 100% human-like professional tone. Do not mention Gemini, AI, or any tech company. Provide:\n"
-        "1. Market Direction (BUY / SELL / WAIT)\n"
-        "2. Exact Entry Point, 3 Take-Profit Targets, and a tight Stop-Loss matching 1:2 risk/reward ratio.\n"
-        "3. Visual structural justification from the candles."
+        "You are the Head of Technical Analysis at SmartEntry Global Fund.\n"
+        "Look carefully at this financial chart image from the user's mobile.\n"
+        "1. Detect the timeframe from the top left corner (M5, M15, M30, H1).\n"
+        "2. Look at the volume bars at the bottom of the chart to confirm institutional momentum.\n"
+        "Formulate a strict, direct, and zero-fluff trading signal in Arabic. Provide exactly:\n"
+        "1. Detected Asset & Timeframe\n"
+        "2. Action (BUY / SELL / WAIT)\n"
+        "3. Exact Entry Price\n"
+        "4. Target 1, Target 2, Target 3\n"
+        "5. Tight Stop-Loss matching 1:2 risk/reward ratio\n"
+        "6. Management rule: (عند ضرب الهدف الأول، يتم نقل وقف الخسارة فوراً إلى نقطة الدخول لتأمين الأرباح الحين).\n"
+        "Do not write any long paragraphs or introductions. Just bullets."
     )
 
-    # 1️⃣ خط الدفاع الأول والأساسي: جيميناي فلاش 2026 مع رفع التايم أوت لـ 30 ثانية
+    # 1️⃣ خط الدفاع الأول: وحش جيميناي الحديث المستقر لعام 2026
     if GEMINI_API_KEY:
         try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
@@ -92,7 +104,7 @@ def analyze_chart_image(image_bytes):
                 "contents": [{
                     "parts": [
                         {"text": vision_prompt},
-                        {"inline_data": {"mime_type": "image/jpeg", "data": image_base64}}
+                        {"inlineData": {"mimeType": "image/jpeg", "data": image_base64}}
                     ]
                 }],
                 "generationConfig": {"temperature": 0.0}
@@ -101,11 +113,11 @@ def analyze_chart_image(image_bytes):
             if res.status_code == 200:
                 res_json = res.json()
                 if 'candidates' in res_json and len(res_json['candidates']) > 0:
-                    return f"👑 **SmartEntry Global | وحدة التحليل البصري العظمى** 👑\n\n" + res_json['candidates'][0]['content']['parts'][0]['text']
-        except Exception:
-            pass  # حظر الخطأ والانتقال فوراً لخط الدفاع التكميلي بدون إزعاج المستخدم
+                    report = res_json['candidates'][0]['content']['parts'][0]['text']
+                    return report + AGENCY_SIGNATURE
+        except Exception: pass
 
-    # 2️⃣ خط الدفاع الثاني التلقائي (في حال لاق أو تايم أوت جوجل): Groq Vision الخاطف
+    # 2️⃣ خط الدفاع الثاني الاحتياطي: جروك البصري السريع (Groq Vision)
     if GROQ_API_KEY:
         try:
             url = "https://api.groq.com/openai/v1/chat/completions"
@@ -123,34 +135,7 @@ def analyze_chart_image(image_bytes):
             res = requests.post(url, json=payload, headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}, timeout=15)
             if res.status_code == 200:
                 report = res.json()['choices'][0]['message']['content']
-                return f"👑 **SmartEntry Global | وحدة التحليل البصري الاحتياطية (قوة سريعة)** 👑\n\n" + report.replace("Groq", "").replace("Llama", "")
-        except Exception:
-            pass
+                return report.replace("Groq", "").replace("Llama", "") + AGENCY_SIGNATURE
+        except Exception: pass
 
-    # 3️⃣ خط الدفاع الثالث والأخير: OpenRouter Vision
-    if OPENROUTER_API_KEY:
-        try:
-            url = "https://openrouter.ai/api/v1/chat/completions"
-            headers = {
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json",
-                "HTTP-Referer": "https://smartentry.global", "X-Title": "SmartEntry"
-            }
-            payload = {
-                "model": "meta-llama/llama-3.2-11b-vision-instruct:free",
-                "messages": [{
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": vision_prompt},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
-                    ]
-                }],
-                "temperature": 0.0
-            }
-            res = requests.post(url, json=payload, headers=headers, timeout=15)
-            if res.status_code == 200:
-                report = res.json()['choices'][0]['message']['content']
-                return f"👑 **SmartEntry Global | وحدة التحليل البصري الاحتياطية (مسار طوارئ)** 👑\n\n" + report.replace("Groq", "").replace("Llama", "")
-        except Exception:
-            pass
-
-    return "⚠️ **تنبيه من غرفة المقاصة:** كافة السيرفرات العالمية ممتلئة بالطلبات الحين، يرجى إعادة إرسال الشارت بعد ثوانٍ قليلة."
+    return "⚠️ **تنبيه المحرك:** السيرفرات مشغولة الحين، يرجى إرسال الشارت بعد ثوانٍ قليلة."
