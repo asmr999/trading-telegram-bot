@@ -156,6 +156,31 @@ def increment_user_trial(user_id):
         db[u_id]["total_used"] += 1
         save_user_data(db)
 
+async def market_scanner_loop(application: Application):
+    try:
+        while True:
+            await asyncio.sleep(3600)
+            global SIGNAL_CHAT_ID
+            if SIGNAL_CHAT_ID:
+                try:
+                    from ai_analyst import analyze_market_data_text
+                    for asset in ["xau", "btc"]:
+                        market_info = get_twelve_data_multi_frame(asset)
+                        analysis_result = analyze_market_data_text(market_info)
+                        output = f"🦅 **تقرير دوري عاجل من وحدة إدارة التدفقات** 🦅\n\n{analysis_result}"
+                        try:
+                            await application.bot.send_message(chat_id=SIGNAL_CHAT_ID, text=output, parse_mode="Markdown")
+                        except Exception:
+                            await application.bot.send_message(chat_id=SIGNAL_CHAT_ID, text=output)
+                        await asyncio.sleep(3)
+                except Exception: pass
+    except asyncio.CancelledError: pass
+
+async def post_init(application: Application) -> None:
+    load_stored_chat_id()
+    task = asyncio.create_task(market_scanner_loop(application))
+    background_tasks.add(task)
+
 async def start_command(update: Update, context):
     context.user_data['awaiting_support'] = False
     context.user_data['awaiting_id'] = False
@@ -216,7 +241,7 @@ async def process_user_chart(update: Update, context, is_doc=False):
         if elapsed < 600:
             rem_mins = int((600 - elapsed) // 60)
             rem_secs = int((600 - elapsed) % 60)
-            await update.message.reply_text(f"⚠️ **عذراً ليدر! نظام حماية السيرفر مفعّل الحين.**\nيرجى الانتظار `{rem_mins}` دقائق و `{rem_secs}` ثوانٍ قبل إرسال شارت جديد لحظر السبام.", parse_mode="Markdown")
+            await update.message.reply_text(f"⚠️ **عذراً ليدر! نظام حماية السيرفر مفعّل الحين.**\nيرجى الانتظار `{rem_mins}` دقائق و `{rem_secs}` thوانٍ قبل إرسال شارت جديد لحظر السبام.", parse_mode="Markdown")
             return
 
     allowed, rem_count = check_user_trial_status(user_id)
@@ -245,12 +270,16 @@ async def process_user_chart(update: Update, context, is_doc=False):
         from ai_analyst import analyze_chart_image
         analysis_text = analyze_chart_image(image_bytes)
         
-        increment_user_trial(user_id)
-        cooldowns[user_id] = now
-        
-        _, current_rem = check_user_trial_status(user_id)
-        rem_alert = f"\n\n📊 *بقي لك الحين {current_rem} محاولات مجانية لنهاية الأسبوع الحالي.*" if current_rem < 4 else ""
-        final_output = analysis_text + rem_alert
+        # 🔥 ذكاء الفحص الفولاذي: إذا رجع خطأ أو تنبيه طوارئ، مستحيل نخصم محاولة ومستحيل نشغل الكول داون!
+        if "⚠️" in analysis_text or "❌" in analysis_text:
+            final_output = analysis_text
+        else:
+            # نجح الفرز كلياً -> الحين فقط نخصم المحاولة ونفعّل عداد الـ 10 دقائق
+            increment_user_trial(user_id)
+            cooldowns[user_id] = now
+            _, current_rem = check_user_trial_status(user_id)
+            rem_alert = f"\n\n📊 *بقي لك الحين {current_rem} محاولات مجانية لنهاية الأسبوع الحالي.*" if current_rem < 4 else ""
+            final_output = analysis_text + rem_alert
         
         try:
             await update.message.reply_text(final_output, parse_mode="Markdown")
@@ -296,7 +325,6 @@ async def handle_callback_queries(update: Update, context):
     
     if data.startswith("approve_"):
         target_uid = data.split("_")[1]
-        # حماية إضافية: لو المستخدم غير مسجل، يتم تهيئته فوراً الحين لمنع الكراش
         if target_uid not in db:
             db[target_uid] = {"status": "FREE", "total_used": 0, "week_used": 0, "week_start": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
         
@@ -329,7 +357,6 @@ async def handle_text_buttons(update: Update, context):
     user_id = update.effective_user.id
     global SIGNAL_CHAT_ID
     
-    # 🔥 حقن التعديل الملوكي: إلحاق أزرار التفعيل الفوري مع رسائل الدعم الفني كمان الحين!
     if context.user_data.get('awaiting_support'):
         context.user_data['awaiting_support'] = False
         user = update.effective_user
@@ -346,7 +373,6 @@ async def handle_text_buttons(update: Update, context):
             f"💡 *إجراء لليدر:* إذا كانت الرسالة عبارة عن ID، يمكنك الضغط على زر التفعيل بالأسفل فوراً الحين."
         )
         
-        # ربط الكيبورد الشفاف برسائل الدعم لحل المشكلة كلياً الحين
         keyboard = [
             [InlineKeyboardButton("🟢 تأكيد واعتماد VIP", callback_data=f"approve_{user.id}"),
              InlineKeyboardButton("🔴 رفض الطلب", callback_data=f"reject_{user.id}")]
