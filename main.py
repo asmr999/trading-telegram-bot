@@ -42,14 +42,20 @@ def load_user_data():
         if os.path.exists(DATA_FILE):
             try:
                 with open(DATA_FILE, "r") as f: return json.load(f)
-            except Exception: return {}
+            except Exception as e:
+                print(f"❌ [load_user_data] الملف تالف أو غير قابل للقراءة: {str(e)}")
+                return {}
         return {}
 
 def save_user_data(data):
     with data_lock:
         try:
-            with open(DATA_FILE, "w") as f: json.dump(data, f, indent=4)
-        except Exception: pass
+            tmp_path = DATA_FILE + ".tmp"
+            with open(tmp_path, "w") as f:
+                json.dump(data, f, indent=4)
+            os.replace(tmp_path, DATA_FILE)  # كتابة ذرية - ما تتلف الملف حتى لو صار Restart مفاجئ
+        except Exception as e:
+            print(f"❌ [save_user_data] فشل حفظ بيانات المستخدمين: {str(e)}")
 
 def load_stored_chat_id():
     global SIGNAL_CHAT_ID
@@ -321,8 +327,8 @@ async def process_user_chart(update: Update, context, is_doc=False):
             mime_type = "image/jpeg"
 
         image_bytes = await file_obj.download_as_bytearray()
-        from ai_analyst import analyze_chart_image
-        analysis_text = analyze_chart_image(image_bytes, mime_type=mime_type)
+        from ai_analyst import analyze_chart_image_grounded
+        analysis_text = analyze_chart_image_grounded(image_bytes, mime_type=mime_type)
         
         # ذكاء الفحص: لو رجع خطأ أو تنبيه طوارئ، مستحيل نخصم محاولة ومسح العداد الحين
         if "⚠️" in analysis_text or "❌" in analysis_text:
