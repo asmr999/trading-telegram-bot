@@ -18,7 +18,7 @@ INSTITUTIONAL_PROMPT = (
     "[🟢 شراء BUY] أو [🔴 بيع SELL] أو [🟡 انتظار عند وصول السعر WAIT].\n"
     "3. 🎯 نسبة نجاح الصفقة المتوقعة فَنياً: حدد نسبة مئوية دقيقة بناءً على قوة النموذج وحجم السيولة (مثال: 🔥 نسبة النجاح المتوقعة: 88%).\n"
     "4. سعر الدخول (Entry Price): حدد ما إذا كان الدخول لحظياً فورياً الحين أو توقع خبراء شايفين إنه يستنى السعر المناسب ويضع أمراً معلقاً (Pending Order: Limit/Stop).\n"
-    "5. جني الأرباح التصاعدي الفني الحين: الهدف 1، الهدف 2، الهدف 3.\n"
+    "5. جني الأرباح التصاعدي الفني الحين: الهدف 1، الهدف 2., الهدف 3.\n"
     "6. وقف الخسارة الصارم (Stop Loss) بما يضمن إدارة مخاطر 1:2 بالملّي.\n"
     "7. قاعدة أمان إدارة الصفقة: (عند ضرب الهدف الأول، يتم نقل وقف الخسارة فوراً إلى نقطة الدخول لتأمين الصفقة الحين كلياً).\n"
     "8. ⚠️ ملاحظة قوية للتحليل المرسل: تنبيه صارم بخصوص إدارة رأس المال وحتمية الالتزام بالاستوب لوز لحماية المحفظة من انعكاسات السيولة المفاجئة الحين.\n\n"
@@ -41,9 +41,7 @@ def fetch_model_stance_and_text(provider, url, headers, payload, response_type="
             res_data = res.json()
             if response_type == "openai":
                 choices = res_data.get('choices', [])
-                if choices:
-                    content = choices[0].get('message', {}).get('content', '')
-                else: content = ''
+                content = choices[0].get('message', {}).get('content', '') if choices else ''
             else:
                 content = res_data.get('text', '')
                 
@@ -70,12 +68,11 @@ def analyze_market_data_text(indicators_text):
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
             payload = {
                 "contents": [{"parts": [{"text": full_prompt}]}],
-                "generationConfig": {"temperature": 0.0}
+                "generation_config": {"temperature": 0.0}
             }
             res = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}, timeout=15)
             if res.status_code == 200:
                 res_json = res.json()
-                # 🔐 تأمين الهيكل الدفاعي ضد الـ KeyError الحين
                 candidates = res_json.get('candidates', [])
                 if candidates:
                     parts = candidates[0].get('content', {}).get('parts', [])
@@ -124,20 +121,19 @@ def analyze_chart_image(image_bytes):
     if GEMINI_API_KEY:
         try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
-            # 🔥 الهيكل الدفاعي الصحيح والـ camelCase الصارم لمستقبل بايثون 2026 الحين لقراءة الصور
+            # 🔥 التثبيت التاريخي: إرجاع صيغة snake_case المعتمدة رسمياً للسيرفر (inline_data و mime_type و generation_config)
             payload = {
                 "contents": [{
                     "parts": [
                         {"text": vision_prompt},
-                        {"inlineData": {"mimeType": "image/jpeg", "data": image_base64}}
+                        {"inline_data": {"mime_type": "image/jpeg", "data": image_base64}}
                     ]
                 }],
-                "generationConfig": {"temperature": 0.0}
+                "generation_config": {"temperature": 0.0}
             }
             res = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}, timeout=30)
             if res.status_code == 200:
                 res_json = res.json()
-                # 🔐 تأمين وتطهير هيكل الرؤية من الـ KeyError كلياً الحين الحين
                 candidates = res_json.get('candidates', [])
                 if candidates:
                     parts = candidates[0].get('content', {}).get('parts', [])
