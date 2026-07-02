@@ -16,6 +16,16 @@ CONFIG_FILE = "signals_config.json"
 SIGNAL_CHAT_ID = None
 TWELVE_DATA_API_KEY = os.environ.get("TWELVE_DATA_API_KEY")
 
+# 🛡️ خزنة تتبع المهام الخلفية لمنع ظهور أي سطور حمراء في ريندر أثناء التحديث
+background_tasks = set()
+
+@flask_app.route('/')
+def health_check(): return "SmartEntry Full-Feature Institutional Terminal Online!", 200
+
+def run_flask_server():
+    port = int(os.environ.get("PORT", 10000))
+    flask_app.run(host='0.0.0.0', port=port)
+
 def load_stored_chat_id():
     global SIGNAL_CHAT_ID
     if os.path.exists(CONFIG_FILE):
@@ -31,13 +41,6 @@ def save_stored_chat_id(chat_id):
     try:
         with open(CONFIG_FILE, "w") as f: json.dump({"signal_chat_id": chat_id}, f)
     except Exception: pass
-
-@flask_app.route('/')
-def health_check(): return "SmartEntry Full-Feature Institutional Terminal Online!", 200
-
-def run_flask_server():
-    port = int(os.environ.get("PORT", 10000))
-    flask_app.run(host='0.0.0.0', port=port)
 
 def get_twelve_data_multi_frame(asset_keyword="xau"):
     if not TWELVE_DATA_API_KEY:
@@ -84,26 +87,41 @@ def get_twelve_data_multi_frame(asset_keyword="xau"):
     return f"📊 أداة التداول: {selected['name']}\n💰 سعر التنفيذ اللحظي المستقر: ${fallback_p:.2f}"
 
 async def market_scanner_loop(application: Application):
-    while True:
-        await asyncio.sleep(3600)
-        global SIGNAL_CHAT_ID
-        if SIGNAL_CHAT_ID:
-            try:
-                from ai_analyst import analyze_market_data_text
-                for asset in ["xau", "btc"]:
-                    market_info = get_twelve_data_multi_frame(asset)
-                    analysis_result = analyze_market_data_text(market_info)
-                    output = f"🦅 **تقرير دوري عاجل من وحدة إدارة التدفقات** 🦅\n\n{analysis_result}"
-                    await application.bot.send_message(chat_id=SIGNAL_CHAT_ID, text=output, parse_mode="Markdown")
-                    await asyncio.sleep(3)
-            except Exception: pass
+    """دالة الفحص الآلي المستمر - تدعم الإلغاء الآمن الحين بدون كراشات"""
+    try:
+        while True:
+            await asyncio.sleep(3600)
+            global SIGNAL_CHAT_ID
+            if SIGNAL_CHAT_ID:
+                try:
+                    from ai_analyst import analyze_market_data_text
+                    for asset in ["xau", "btc"]:
+                        market_info = get_twelve_data_multi_frame(asset)
+                        analysis_result = analyze_market_data_text(market_info)
+                        output = f"🦅 **تقرير دوري عاجل من وحدة إدارة التدفقات** 🦅\n\n{analysis_result}"
+                        await application.bot.send_message(chat_id=SIGNAL_CHAT_ID, text=output, parse_mode="Markdown")
+                        await asyncio.sleep(3)
+                except Exception: pass
+    except asyncio.CancelledError:
+        logging.info("🔒 [وحدة التأمين]: تم إلغاء مهمة الفحص الدوري بنجاح وبأمان تلو تطفية السيرفر الحين.")
 
 async def post_init(application: Application) -> None:
     load_stored_chat_id()
-    asyncio.create_task(market_scanner_loop(application))
+    # إنشاء وتثبيت المهمة داخل الخزنة الرقمية
+    task = asyncio.create_task(market_scanner_loop(application))
+    background_tasks.add(task)
+    task.add_done_callback(background_tasks.discard)
+
+async def post_shutdown(application: Application) -> None:
+    """🛡️ الهندسة الصارمة: إغلاق وتنظيف كامل المهام الخلفية بلطف ومنع السطور الحمراء كلياً للأبد"""
+    logging.info("⏳ جاري تنظيف وإلغاء كافة المهام المعلقة بالخلفية الحين...")
+    for task in background_tasks:
+        task.cancel()
+    if background_tasks:
+        await asyncio.gather(*background_tasks, return_exceptions=True)
+    logging.info("✅ تم التطهير والإغلاق الآمن مية بالمية.")
 
 async def start_command(update: Update, context):
-    # إقلاع القائمة الملوكية للأزرار بشكل تلقائي وبدون عيوب الحين
     keyboard = [
         [KeyboardButton("📊 طلب صفقة مضاربة")],
         [KeyboardButton("👑 مجاني VIP اشتراك"), KeyboardButton("📞 الدعم الفني")]
@@ -149,7 +167,6 @@ async def handle_chart_photo(update: Update, context):
         await update.message.reply_text(f"❌ خطأ بمسح الصورة: {str(e)}")
 
 async def handle_text_buttons(update: Update, context):
-    """🔥 إعادة إحياء وتأمين الأزرار لتستجيب فوراً وبذكاء وبدون أي تعليق"""
     text = update.message.text
     if "طلب صفقة مضاربة" in text:
         await update.message.reply_text("🦅 **أبشر يا ليدر!** ارفع صورة شارت الزوج الحالي من جوالك الحين، وسيقوم وحش العين البصرية بمسح الشموع والدعوم فوراً وإصدار صفقات ملوكية! 📈")
@@ -161,7 +178,9 @@ async def handle_text_buttons(update: Update, context):
 if __name__ == '__main__':
     threading.Thread(target=run_flask_server, daemon=True).start()
     TOKEN = os.environ.get("BOT_TOKEN", "8518436165:AAH2-DjOv0lh9EPpeatvKhAIX-1ODvvvIfY")
-    application = Application.builder().token(TOKEN).post_init(post_init).build()
+    
+    # ربط دوال الإقلاع والإغلاق الآمن معاً لضمان صفر أخطاء
+    application = Application.builder().token(TOKEN).post_init(post_init).post_shutdown(post_shutdown).build()
     
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("setup_signals", setup_signals_command))
@@ -169,5 +188,5 @@ if __name__ == '__main__':
     application.add_handler(MessageHandler(filters.PHOTO, handle_chart_photo))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_buttons))
     
-    print("Multi-Frame System fully deployed with fixed buttons.")
+    print("Multi-Frame System fully deployed with safe shutdown pipeline.")
     application.run_polling()
