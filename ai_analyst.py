@@ -36,6 +36,70 @@ GROQ_TEXT_MODEL = "openai/gpt-oss-120b"
 # ✅ الموديل البصري الحالي عند Groq (llama-3.2-11b-vision-preview متوقف من زمان)
 GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
+# 🔒 برومبت خاص بالإدارة فقط: يمنع الموديل من اختراع أي رقم، ويلزمه يستخدم الأرقام
+# المحسوبة رياضياً فقط. هذا للاستخدام الداخلي للإدارة، وليس توصية جاهزة للنشر.
+ADMIN_ONLY_PROMPT = (
+    "أنت محلل فني تابع لغرفة عمليات داخلية. هذا التحليل يطّلع عليه عضو إدارة أولاً، وهو من يقرر "
+    "لاحقاً (بضغطة زر منفصلة) هل ينشره لمجموعة الـ VIP أو يرفضه - أنت لا تقرر النشر ولا تخاطب العميل مباشرة.\n"
+    "معك أرقام مؤشرات فنية حقيقية محسوبة رياضياً من بيانات السوق الفعلية (RSI, EMA, MACD).\n"
+    "قواعد صارمة يجب الالتزام بها:\n"
+    "1. ممنوع اختراع أي نسبة نجاح أو رقم غير موجود بالمعطيات المرسلة لك. استخدم فقط 'درجة التوافق الفني' "
+    "الممررة لك كما هي بدون تعديل، واذكرها كـ'درجة توافق فني' وليس 'نسبة نجاح مضمونة'.\n"
+    "2. اشرح بإيجاز لماذا الاتجاه المحسوب (BUY/SELL/WAIT) طلع كذا بالاعتماد على المؤشرات المعطاة فقط.\n"
+    "3. اقترح مستوى دخول ووقف خسارة وأهداف منطقية بناءً على السعر الحالي والتذبذب، مع ذكر إنها اقتراحات "
+    "وليست ضمانات.\n"
+    "4. اختم بجملة قصيرة تذكّر بمخاطر التداول وأن لا شيء مضمون بالأسواق.\n"
+    "5. ممنوع أي مقدمات تسويقية أو ذكر جهات تسويق أو روابط - هذا الجزء تتكفل به الإدارة يدوياً إذا قررت النشر."
+)
+
+
+def generate_admin_technical_report(indicators_text):
+    """
+    تقرير داخلي للإدارة فقط: يعتمد كلياً على أرقام محسوبة رياضياً (indicators.py)
+    ويُطلب من الموديل تفسيرها فقط - بدون اختراع أي نسبة جديدة، وبدون توقيع تسويقي VIP.
+    """
+    full_prompt = f"{ADMIN_ONLY_PROMPT}\n\n[الأرقام المحسوبة فعلياً]:\n{indicators_text}"
+
+    if GEMINI_API_KEY:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+            payload = {
+                "contents": [{"parts": [{"text": full_prompt}]}],
+                "generationConfig": {"temperature": 0.0}
+            }
+            res = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}, timeout=15)
+            if res.status_code == 200:
+                candidates = res.json().get('candidates', [])
+                if candidates:
+                    parts = candidates[0].get('content', {}).get('parts', [])
+                    if parts and parts[0].get('text'):
+                        return parts[0]['text']
+            else:
+                print(f"🚨 [Gemini-admin] كود: {res.status_code} | {res.text[:300]}")
+        except Exception as e:
+            print(f"❌ [Gemini-admin] كراش: {str(e)}")
+
+    if GROQ_API_KEY:
+        try:
+            res = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                json={"model": GROQ_TEXT_MODEL, "messages": [{"role": "user", "content": full_prompt}], "temperature": 0.0},
+                headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+                timeout=15
+            )
+            if res.status_code == 200:
+                choices = res.json().get('choices', [])
+                if choices:
+                    content = choices[0].get('message', {}).get('content', '')
+                    if content:
+                        return content
+            else:
+                print(f"🚨 [Groq-admin] كود: {res.status_code} | {res.text[:300]}")
+        except Exception as e:
+            print(f"❌ [Groq-admin] كراش: {str(e)}")
+
+    return "❌ تعذر توليد التقرير الداخلي الآن، حاول مرة أخرى."
+
 
 def fetch_model_stance_and_text(provider, url, headers, payload, response_type="openai"):
     try:
