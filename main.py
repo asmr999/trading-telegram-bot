@@ -266,12 +266,16 @@ async def process_user_chart(update: Update, context, is_doc=False):
     try:
         if is_doc:
             file_obj = await update.message.document.get_file()
+            # نأخذ نوع الملف الحقيقي المرسل (مثلاً image/png) بدل افتراض jpeg دايماً
+            mime_type = update.message.document.mime_type or "image/jpeg"
         else:
             file_obj = await update.message.photo[-1].get_file()
-            
+            # صور تيليجرام العادية (غير المرسلة كملف) دايماً jpeg
+            mime_type = "image/jpeg"
+
         image_bytes = await file_obj.download_as_bytearray()
         from ai_analyst import analyze_chart_image
-        analysis_text = analyze_chart_image(image_bytes)
+        analysis_text = analyze_chart_image(image_bytes, mime_type=mime_type)
         
         # ذكاء الفحص: لو رجع خطأ أو تنبيه طوارئ، مستحيل نخصم محاولة ومسح العداد الحين
         if "⚠️" in analysis_text or "❌" in analysis_text:
