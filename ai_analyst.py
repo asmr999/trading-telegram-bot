@@ -2,27 +2,28 @@ import os
 import base64
 import requests
 
-# 🔐 خزنة المفاتيح الحرة والمؤمنة لعام 2026
+# خزنة المفاتيح الحرة والمؤمنة لعام 2026
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 SAMBANOVA_API_KEY = os.environ.get("SAMBANOVA_API_KEY")
 COHERE_API_KEY = os.environ.get("COHERE_API_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 
-# 🎭 ميثاق الاختصار الصارم لمنع الحشو وطباعة الصافي الفوري الحين
+# ميثاق الاختصار الصارم الحين والموجه لأمهر الخبراء الماليين
 INSTITUTIONAL_PROMPT = (
     "أنت رئيس اللجنة الفنية العليا لإدارة السيولة بصندوق SmartEntry العالمي.\n"
-    "يُمنع منعاً باتاً كتابة أي مقدمات أو فقرات إنشائية أو الإشارة لشركات الذكاء الاصطناعي.\n"
-    "صغ التقرير في نقاط جافة ومباشرة للمتداول الحين كالتالي حصراً:\n"
+    "يُمنع منعاً باتاً كتابة أي مقدمات أو فقرات إنشائية أو الإشارة لشركات الذكاء الاصطناعي نهائياً.\n"
+    "صغ التقرير بناءً على قراءة خبراء ماليين في نقاط جافة ومباشرة للمتداول الحين كالتالي حصراً:\n"
     "1. نوع الأداة والفريم المكتشف (مثال: الذهب XAUUSD | فريم 15 دقيقة).\n"
-    "2. اتجاه الحركة اللحظي (شراء BUY أو بيع SELL أو انتظار HOLD).\n"
-    "3. نقطة الدخول الصافية (Entry Price).\n"
-    "4. جني الأرباح التصاعدي: الهدف 1، الهدف 2، الهدف 3.\n"
-    "5. وقف الخسارة الصارم (Stop Loss).\n"
-    "6. قاعدة أمان إدارة الصفقة: (عند ضرب الهدف الأول، يتم نقل وقف الخسارة فوراً إلى نقطة الدخول لتأمين الصفقة الحين كلياً)."
+    "2. اتجاه الحركة اللحظي الصارم: اكتب حصراً أحد العناوين الثلاثة التالية في سطر منفصل وبخط عريض: "
+    "[🟢 شراء BUY] أو [🔴 بيع SELL] أو [🟡 انتظار عند وصول السعر WAIT].\n"
+    "3. سعر الدخول (Entry Price): حدد ما إذا كان الدخول لحظياً فورياً الحين أو توقع خبراء شايفين إنه يستنى السعر المناسب ويضع أمراً معلقاً (Pending Order: Limit/Stop).\n"
+    "4. جني الأرباح التصاعدي الفني الحين: الهدف 1، الهدف 2، الهدف 3.\n"
+    "5. وقف الخسارة الصارم (Stop Loss) بما يضمن إدارة مخاطر 1:2 بالملّي.\n"
+    "6. قاعدة أمان إدارة الصفقة: (عند ضرب الهدف الأول، يتم نقل وقف الخسارة فوراً إلى نقطة الدخول لتأمين الصفقة الحين كلياً).\n"
+    "7. ⚠️ ملاحظة قوية للتحليل المرسل: تنبيه صارم بخصوص إدارة رأس المال وحتمية الالتزام بالاستوب لوز لحماية المحفظة من انعكاسات السيولة المفاجئة الحين.\n\n"
+    "اسم المنصة الخاص بنا: منصتنا الخاصة بتحليل أمهر الخبراء الماليين الحين."
 )
 
-# 🔥 حقن رابط وكالتك الحقيقي والـ Partner Code مالتك بالملّي الحين لضمان العمولات دغري
 AGENCY_SIGNATURE = (
     "\n━━━━━━━━━━━━━━━━━━━━━━━━\n"
     "👑 **صادر برعاية المحفظة المؤسسية الكبرى** 👑\n"
@@ -33,7 +34,7 @@ AGENCY_SIGNATURE = (
 
 def fetch_model_stance_and_text(provider, url, headers, payload, response_type="openai"):
     try:
-        res = requests.post(url, json=payload, headers=headers, timeout=10)
+        res = requests.post(url, json=payload, headers=headers, timeout=12)
         if res.status_code == 200:
             res_data = res.json()
             content = res_data['choices'][0]['message']['content'] if response_type == "openai" else res_data.get('text', '')
@@ -47,8 +48,26 @@ def fetch_model_stance_and_text(provider, url, headers, payload, response_type="
 def analyze_market_data_text(indicators_text):
     votes = {"BUY": 0, "SELL": 0, "HOLD": 0}
     collected_reports = []
-    full_prompt = f"{INSTITUTIONAL_PROMPT}\n\nأسعار البورصة الحية الحين:\n{indicators_text}"
     
+    full_prompt = (
+        f"{INSTITUTIONAL_PROMPT}\n\n"
+        f"[المعطيات الرقمية المفلترة لسعر السوق الحالي الحين]:\n{indicators_text}\n\n"
+        f"قم بصياغة توصية فائقة الدقة وخالية من الأخطاء الفنية كلياً الحين."
+    )
+    
+    if GEMINI_API_KEY:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+            payload = {
+                "contents": [{"parts": [{"text": full_prompt}]}],
+                "generationConfig": {"temperature": 0.0}
+            }
+            res = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}, timeout=15)
+            if res.status_code == 200:
+                report = res.json()['candidates'][0]['content']['parts'][0]['text']
+                return report + AGENCY_SIGNATURE
+        except Exception: pass
+
     if GROQ_API_KEY:
         s, t = fetch_model_stance_and_text("Groq", "https://api.groq.com/openai/v1/chat/completions", {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}, {"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": full_prompt}], "temperature": 0.0})
         if s: votes[s] += 1; collected_reports.append(t)
@@ -57,12 +76,8 @@ def analyze_market_data_text(indicators_text):
         s, t = fetch_model_stance_and_text("SambaNova", "https://api.sambanova.ai/v1/chat/completions", {"Authorization": f"Bearer {SAMBANOVA_API_KEY}", "Content-Type": "application/json"}, {"model": "Meta-Llama-3.1-70B-Instruct", "messages": [{"role": "user", "content": full_prompt}], "temperature": 0.0})
         if s: votes[s] += 1; collected_reports.append(t)
 
-    if COHERE_API_KEY:
-        s, t = fetch_model_stance_and_text("Cohere", "https://api.cohere.com/v1/chat", {"Authorization": f"Bearer {COHERE_API_KEY}", "Content-Type": "application/json"}, {"model": "command-r-plus", "message": full_prompt, "temperature": 0.0}, response_type="cohere")
-        if s: votes[s] += 1; collected_reports.append(t)
-
     if not collected_reports:
-        return "⚠️ **[تنبيه]:** خوادم الفرز ممتلئة حالياً الحين، يرجى إعادة طلب الأمر."
+        return "⚠️ **تنبيه فني الحين:** السيرفرات الرقمية تحت صيانة سريعة، يرجى إعادة المحاولة الحين."
 
     final_decision = max(votes, key=votes.get)
     best_report = collected_reports[0]
@@ -74,29 +89,21 @@ def analyze_market_data_text(indicators_text):
             best_report = report
             break
 
-    clean_report = best_report.replace("Groq", "").replace("OpenAI", "").replace("Gemini", "").replace("ChatGPT", "").replace("Llama", "")
+    clean_report = best_report.replace("Groq", "").replace("OpenAI", "").replace("Gemini", "").replace("Llama", "")
     return clean_report + AGENCY_SIGNATURE
 
 def analyze_chart_image(image_bytes):
-    """👁️ العين البصرية الجبارة: تحليل الفريم وأعمدة الفوليوم لعام 2026 مع شلال طوارئ تلقائي"""
     image_base64 = base64.b64encode(image_bytes).decode('utf-8')
     
     vision_prompt = (
-        "You are the Head of Technical Analysis at SmartEntry Global Fund.\n"
-        "Look carefully at this financial chart image from the user's mobile.\n"
-        "1. Detect the timeframe from the top left corner (M5, M15, M30, H1).\n"
-        "2. Look at the volume bars at the bottom of the chart to confirm institutional momentum.\n"
-        "Formulate a strict, direct, and zero-fluff trading signal in Arabic. Provide exactly:\n"
-        "1. Detected Asset & Timeframe\n"
-        "2. Action (BUY / SELL / WAIT)\n"
-        "3. Exact Entry Price\n"
-        "4. Target 1, Target 2, Target 3\n"
-        "5. Tight Stop-Loss matching 1:2 risk/reward ratio\n"
-        "6. Management rule: (عند ضرب الهدف الأول، يتم نقل وقف الخسارة فوراً إلى نقطة الدخول لتأمين الأرباح الحين).\n"
-        "Do not write any long paragraphs or introductions. Just bullets."
+        f"{INSTITUTIONAL_PROMPT}\n\n"
+        "أمامك الآن صورة شارت حية من TradingView أرسلها العميل. انظر بدقة فائقة وبدون أي أخطاء نهائياً للأركان التالية الحين:\n"
+        "1. حدد اسم الأداة والفريم بوضوح من أعلى اليسار الحين.\n"
+        "2. انظر لأعمدة حجم التداول (Volume Bars) بالأسفل لتأكد ما إذا كان الكسر حقيقياً ومسنوداً بسيولة مؤسسية أو فخ كاذب.\n"
+        "3. صغ التوصية ملوكي ومفلترة لسعر السوق بالملّي: حدد الاتجاه الصافي [شراء أو بيع أو انتظار]، وضَع سعر الدخول لحظي أو معلق بناءً على رؤية الخبراء، "
+        "واكتب الأهداف والاستوب لوز وقاعدة الأمان والملاحظة القوية الحين كلياً."
     )
 
-    # 1️⃣ خط الدفاع الأول: وحش جيميناي الحديث المستقر لعام 2026
     if GEMINI_API_KEY:
         try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
@@ -104,7 +111,7 @@ def analyze_chart_image(image_bytes):
                 "contents": [{
                     "parts": [
                         {"text": vision_prompt},
-                        {"inlineData": {"mimeType": "image/jpeg", "data": image_base64}}
+                        {"inline_data": {"mime_type": "image/jpeg", "data": image_base64}}
                     ]
                 }],
                 "generationConfig": {"temperature": 0.0}
@@ -113,11 +120,9 @@ def analyze_chart_image(image_bytes):
             if res.status_code == 200:
                 res_json = res.json()
                 if 'candidates' in res_json and len(res_json['candidates']) > 0:
-                    report = res_json['candidates'][0]['content']['parts'][0]['text']
-                    return report + AGENCY_SIGNATURE
+                    return res_json['candidates'][0]['content']['parts'][0]['text'] + AGENCY_SIGNATURE
         except Exception: pass
 
-    # 2️⃣ خط الدفاع الثاني الاحتياطي: جروك البصري السريع (Groq Vision)
     if GROQ_API_KEY:
         try:
             url = "https://api.groq.com/openai/v1/chat/completions"
@@ -134,8 +139,7 @@ def analyze_chart_image(image_bytes):
             }
             res = requests.post(url, json=payload, headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}, timeout=15)
             if res.status_code == 200:
-                report = res.json()['choices'][0]['message']['content']
-                return report.replace("Groq", "").replace("Llama", "") + AGENCY_SIGNATURE
+                return res.json()['choices'][0]['message']['content'].replace("Groq", "").replace("Llama", "") + AGENCY_SIGNATURE
         except Exception: pass
 
-    return "⚠️ **تنبيه المحرك:** السيرفرات مشغولة الحين، يرجى إرسال الشارت بعد ثوانٍ قليلة."
+    return "⚠️ **تنبيه نظام الطوارئ:** لم تتمكن محركات الرؤية من فك الرموز الحين، يرجى إعادة إرسال شارت TradingView واضح كلياً الحين ثانية."
