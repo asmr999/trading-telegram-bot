@@ -2,13 +2,11 @@ import os
 import base64
 import requests
 
-# 🔐 خزنة المفاتيح الحرة والمؤمنة لعام 2026
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 SAMBANOVA_API_KEY = os.environ.get("SAMBANOVA_API_KEY")
 COHERE_API_KEY = os.environ.get("COHERE_API_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# 🎭 ميثاق الاختصار الصارم المحدث بنسبة النجاح الفولاذية الحين للمتداولين
 INSTITUTIONAL_PROMPT = (
     "أنت رئيس اللجنة الفنية العليا لإدارة السيولة بصندوق SmartEntry العالمي.\n"
     "يُمنع منعاً باتاً كتابة أي مقدمات أو فقرات إنشائية أو الإشارة لشركات الذكاء الاصطناعي نهائياً.\n"
@@ -25,7 +23,6 @@ INSTITUTIONAL_PROMPT = (
     "اسم المنصة الخاص بنا: منصتنا الخاصة بتحليل أمهر الخبراء الماليين الحين."
 )
 
-# 🔥 حقن رابط وكالتك الحقيقي والـ Partner Code مالتك بالملّي الحين لضمان العمولات دغري
 AGENCY_SIGNATURE = (
     "\n━━━━━━━━━━━━━━━━━━━━━━━━\n"
     "👑 **صادر برعاية المحفظة المؤسسية الكبرى** 👑\n"
@@ -33,6 +30,12 @@ AGENCY_SIGNATURE = (
     "🔗 **رابط التسجيل والوكالة مالتنا الحين:** https://one.justmarkets.link/a/tr42sl0svg\n"
     "🔑 **Partner Code:** `tr42sl0svg`"
 )
+
+# ✅ الموديلات النصية الحالية عند Groq (llama-3.3-70b-versatile تم إيقافه بتاريخ 17 يونيو 2026)
+GROQ_TEXT_MODEL = "openai/gpt-oss-120b"
+# ✅ الموديل البصري الحالي عند Groq (llama-3.2-11b-vision-preview متوقف من زمان)
+GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+
 
 def fetch_model_stance_and_text(provider, url, headers, payload, response_type="openai"):
     try:
@@ -44,24 +47,28 @@ def fetch_model_stance_and_text(provider, url, headers, payload, response_type="
                 content = choices[0].get('message', {}).get('content', '') if choices else ''
             else:
                 content = res_data.get('text', '')
-                
+
             if content:
                 stance = "HOLD"
                 if "شراء" in content or "BUY" in content.upper(): stance = "BUY"
                 elif "بيع" in content or "SELL" in content.upper(): stance = "SELL"
                 return stance, content
-    except Exception: pass
+        else:
+            print(f"🚨 [{provider}] فشل الطلب - كود: {res.status_code} | الرد: {res.text[:300]}")
+    except Exception as e:
+        print(f"❌ [{provider}] كراش داخلي: {str(e)}")
     return None, None
+
 
 def analyze_market_data_text(indicators_text):
     votes = {"BUY": 0, "SELL": 0, "HOLD": 0}
     collected_reports = []
-    
+
     full_prompt = (
         f"{INSTITUTIONAL_PROMPT}\n\n"
         f"[المعطيات الرقمية المفلترة لسعر السوق الحالي الحين]:\n{indicators_text}"
     )
-    
+
     if GEMINI_API_KEY:
         try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
@@ -79,10 +86,18 @@ def analyze_market_data_text(indicators_text):
                         report = parts[0].get('text', '')
                         if report:
                             return report + AGENCY_SIGNATURE
-        except Exception: pass
+            else:
+                print(f"🚨 [Gemini-text] فشل الطلب - كود: {res.status_code} | الرد: {res.text[:300]}")
+        except Exception as e:
+            print(f"❌ [Gemini-text] كراش داخلي: {str(e)}")
 
     if GROQ_API_KEY:
-        s, t = fetch_model_stance_and_text("Groq", "https://api.groq.com/openai/v1/chat/completions", {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}, {"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": full_prompt}], "temperature": 0.0})
+        s, t = fetch_model_stance_and_text(
+            "Groq",
+            "https://api.groq.com/openai/v1/chat/completions",
+            {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+            {"model": GROQ_TEXT_MODEL, "messages": [{"role": "user", "content": full_prompt}], "temperature": 0.0}
+        )
         if s: votes[s] += 1; collected_reports.append(t)
 
     if not collected_reports:
@@ -101,10 +116,15 @@ def analyze_market_data_text(indicators_text):
     clean_report = best_report.replace("Groq", "").replace("OpenAI", "").replace("Gemini", "").replace("Llama", "")
     return clean_report + AGENCY_SIGNATURE
 
-def analyze_chart_image(image_bytes):
-    """👁️ فحص البث البصري لعام 2026 مع رادار كاشف الأعطال الحية في لوحة ريندر الحين"""
+
+def analyze_chart_image(image_bytes, mime_type="image/jpeg"):
+    """👁️ فحص البث البصري - يدعم اكتشاف نوع الصورة الفعلي بدل افتراض jpeg دايماً"""
     image_base64 = base64.b64encode(image_bytes).decode('utf-8')
-    
+
+    # لو النوع الممرر مو من نوع صورة معروف، رجّعه لـ jpeg كقيمة افتراضية آمنة
+    if mime_type not in ("image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"):
+        mime_type = "image/jpeg"
+
     vision_prompt = (
         f"{INSTITUTIONAL_PROMPT}\n\n"
         "أمامك الآن صورة شارت حية من TradingView أرسلها العميل. انظر بدقة فائقة وبدون أي أخطاء نهائياً للأركان التالية الحين:\n"
@@ -114,7 +134,7 @@ def analyze_chart_image(image_bytes):
         "واكتب الأهداف والاستوب لوز وقاعدة الأمان والملاحظة القوية الحين كلياً."
     )
 
-    # 🟢 خط الدفاع الأول: وحش جيميناي بالصيغة الهندسية الصارمة والـ camelCase
+    # 🟢 خط الدفاع الأول: Gemini
     if GEMINI_API_KEY:
         try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
@@ -122,16 +142,15 @@ def analyze_chart_image(image_bytes):
                 "contents": [{
                     "parts": [
                         {"text": vision_prompt},
-                        {"inlineData": {"mimeType": "image/jpeg", "data": image_base64}}
+                        {"inlineData": {"mimeType": mime_type, "data": image_base64}}
                     ]
                 }],
                 "generationConfig": {"temperature": 0.0}
             }
             res = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}, timeout=30)
-            
-            # 🔥 كاشف الرادار: طباعة رد سيرفر جوجل فوراً في الـ Logs مالت ريندر لو انهار!
-            print(f"🚨 [رادار فحص جوجل] - كود الاستجابة: {res.status_code} | نص الرد: {res.text}")
-            
+
+            print(f"🚨 [رادار فحص جوجل] - كود الاستجابة: {res.status_code} | نص الرد: {res.text[:500]}")
+
             if res.status_code == 200:
                 res_json = res.json()
                 candidates = res_json.get('candidates', [])
@@ -141,28 +160,32 @@ def analyze_chart_image(image_bytes):
                         text_result = parts[0].get('text', '')
                         if text_result:
                             return text_result + AGENCY_SIGNATURE
+                    else:
+                        print("⚠️ [Gemini] الرد رجع بدون parts - غالباً السبب finishReason غير STOP (تحقق من safety/blocked).")
+                else:
+                    print(f"⚠️ [Gemini] لا يوجد candidates بالرد: {res_json}")
         except Exception as e:
             print(f"❌ كراش داخلي في دالة طلب جوجل: {str(e)}")
 
-    # 🔵 خط الدفاع الثاني البديل الفوري: وحش جروك البصري (Groq Vision) الشغال ملوكي
+    # 🔵 خط الدفاع الثاني: Groq Vision (llama-4-scout بدل الموديل المتوقف)
     if GROQ_API_KEY:
         try:
             url = "https://api.groq.com/openai/v1/chat/completions"
             payload = {
-                "model": "llama-3.2-11b-vision-preview",
+                "model": GROQ_VISION_MODEL,
                 "messages": [{
                     "role": "user",
                     "content": [
                         {"type": "text", "text": vision_prompt},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
+                        {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{image_base64}"}}
                     ]
                 }],
                 "temperature": 0.0
             }
             res = requests.post(url, json=payload, headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}, timeout=15)
-            
-            print(f"🚨 [رادار فحص جروك] - كود الاستجابة: {res.status_code}")
-            
+
+            print(f"🚨 [رادار فحص جروك] - كود الاستجابة: {res.status_code} | نص الرد: {res.text[:500]}")
+
             if res.status_code == 200:
                 res_data = res.json()
                 choices = res_data.get('choices', [])
