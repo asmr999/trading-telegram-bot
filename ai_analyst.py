@@ -18,7 +18,7 @@ INSTITUTIONAL_PROMPT = (
     "[🟢 شراء BUY] أو [🔴 بيع SELL] أو [🟡 انتظار عند وصول السعر WAIT].\n"
     "3. 🎯 نسبة نجاح الصفقة المتوقعة فَنياً: حدد نسبة مئوية دقيقة بناءً على قوة النموذج وحجم السيولة (مثال: 🔥 نسبة النجاح المتوقعة: 88%).\n"
     "4. سعر الدخول (Entry Price): حدد ما إذا كان الدخول لحظياً فورياً الحين أو توقع خبراء شايفين إنه يستنى السعر المناسب ويضع أمراً معلقاً (Pending Order: Limit/Stop).\n"
-    "5. جني الأرباح التصاعدي الفني الحين: الهدف 1، الهدف 2., الهدف 3.\n"
+    "5. جني الأرباح التصاعدي الفني الحين: الهدف 1، الهدف 2، الهدف 3.\n"
     "6. وقف الخسارة الصارم (Stop Loss) بما يضمن إدارة مخاطر 1:2 بالملّي.\n"
     "7. قاعدة أمان إدارة الصفقة: (عند ضرب الهدف الأول، يتم نقل وقف الخسارة فوراً إلى نقطة الدخول لتأمين الصفقة الحين كلياً).\n"
     "8. ⚠️ ملاحظة قوية للتحليل المرسل: تنبيه صارم بخصوص إدارة رأس المال وحتمية الالتزام بالاستوب لوز لحماية المحفظة من انعكاسات السيولة المفاجئة الحين.\n\n"
@@ -68,7 +68,7 @@ def analyze_market_data_text(indicators_text):
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
             payload = {
                 "contents": [{"parts": [{"text": full_prompt}]}],
-                "generation_config": {"temperature": 0.0}
+                "generationConfig": {"temperature": 0.0}
             }
             res = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}, timeout=15)
             if res.status_code == 200:
@@ -121,15 +121,15 @@ def analyze_chart_image(image_bytes):
     if GEMINI_API_KEY:
         try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
-            # 🔥 التثبيت التاريخي: إرجاع صيغة snake_case المعتمدة رسمياً للسيرفر (inline_data و mime_type و generation_config)
+            # 🔥 التثبيت والإصلاح الفولاذي الشامل: تفعيل بنية الـ camelCase الحتمية المطلوبة برمجياً الحين
             payload = {
                 "contents": [{
                     "parts": [
                         {"text": vision_prompt},
-                        {"inline_data": {"mime_type": "image/jpeg", "data": image_base64}}
+                        {"inlineData": {"mimeType": "image/jpeg", "data": image_base64}}
                     ]
                 }],
-                "generation_config": {"temperature": 0.0}
+                "generationConfig": {"temperature": 0.0}
             }
             res = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}, timeout=30)
             if res.status_code == 200:
