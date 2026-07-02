@@ -156,36 +156,10 @@ def increment_user_trial(user_id):
         db[u_id]["total_used"] += 1
         save_user_data(db)
 
-async def market_scanner_loop(application: Application):
-    try:
-        while True:
-            await asyncio.sleep(3600)
-            global SIGNAL_CHAT_ID
-            if SIGNAL_CHAT_ID:
-                try:
-                    from ai_analyst import analyze_market_data_text
-                    for asset in ["xau", "btc"]:
-                        market_info = get_twelve_data_multi_frame(asset)
-                        analysis_result = analyze_market_data_text(market_info)
-                        output = f"🦅 **تقرير دوري عاجل من وحدة إدارة التدفقات** 🦅\n\n{analysis_result}"
-                        try:
-                            await application.bot.send_message(chat_id=SIGNAL_CHAT_ID, text=output, parse_mode="Markdown")
-                        except Exception:
-                            await application.bot.send_message(chat_id=SIGNAL_CHAT_ID, text=output)
-                        await asyncio.sleep(3)
-                except Exception: pass
-    except asyncio.CancelledError: pass
-
-async def post_init(application: Application) -> None:
-    load_stored_chat_id()
-    task = asyncio.create_task(market_scanner_loop(application))
-    background_tasks.add(task)
-
 async def start_command(update: Update, context):
     context.user_data['awaiting_support'] = False
     context.user_data['awaiting_id'] = False
     
-    # 🔥 تنظيف وإعادة هيكلة ملوكية: حذف زر التجربة العامة نهائياً من الكيبورد الحين الحين
     keyboard = [
         [KeyboardButton("📊 طلب صفقة مضاربة")],
         [KeyboardButton("👑 اشتراك VIP وكالة Just Martink"), KeyboardButton("📞 الدعم الفني المباشر")]
@@ -322,18 +296,21 @@ async def handle_callback_queries(update: Update, context):
     
     if data.startswith("approve_"):
         target_uid = data.split("_")[1]
-        if target_uid in db:
-            db[target_uid]["status"] = "APPROVED_VIP"
-            save_user_data(db)
-            await query.edit_message_text(text=f"{query.message.text}\n\n✅ **تم اعتماد الحساب وترقيته لـ VIP مدى الحياة بنجاح الحين!**")
-            try:
-                vip_alert = (
-                    "👑 **تهانينا يا ليدر! تم مراجعة حسابك واعتماده من قبل الإدارة كلياً!** 👑\n\n"
-                    "💼 تم تفعيل اشتراكك الدائم مدى الحياة في سيلفر العمليات الكبرى لوكالة **Just Martink** مجاناً!\n"
-                    "📈 الحين قفلنا كامل القيود؛ يمكنك رفع الشارتات وطلب صفقات القنص الفولاذية في أي وقت وبدون ليمت! مبارك الأرباح القادمة! "
-                )
-                await context.bot.send_message(chat_id=int(target_uid), text=vip_alert, parse_mode="Markdown")
-            except Exception: pass
+        # حماية إضافية: لو المستخدم غير مسجل، يتم تهيئته فوراً الحين لمنع الكراش
+        if target_uid not in db:
+            db[target_uid] = {"status": "FREE", "total_used": 0, "week_used": 0, "week_start": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+        
+        db[target_uid]["status"] = "APPROVED_VIP"
+        save_user_data(db)
+        await query.edit_message_text(text=f"{query.message.text}\n\n✅ **تم اعتماد الحساب وترقيته لـ VIP مدى الحياة بنجاح الحين!**")
+        try:
+            vip_alert = (
+                "👑 **تهانينا يا ليدر! تم مراجعة حسابك واعتماده من قبل الإدارة كلياً!** 👑\n\n"
+                "💼 تم تفعيل اشتراكك الدائم مدى الحياة في سيلفر العمليات الكبرى لوكالة **Just Martink** مجاناً!\n"
+                "📈 الحين قفلنا كامل القيود؛ يمكنك رفع الشارتات وطلب صفقات القنص الفولاذية في أي وقت وبدون ليمت! مبارك الأرباح القادمة! "
+            )
+            await context.bot.send_message(chat_id=int(target_uid), text=vip_alert, parse_mode="Markdown")
+        except Exception: pass
             
     elif data.startswith("reject_"):
         target_uid = data.split("_")[1]
@@ -341,17 +318,18 @@ async def handle_callback_queries(update: Update, context):
             db[target_uid]["status"] = "FREE"
             db[target_uid]["week_used"] = 3
             save_user_data(db)
-            await query.edit_message_text(text=f"{query.message.text}\n\n🔴 **تم رفض الطلب وإرسال إشعار المراجعة للمستخدم فوراً.**")
-            try:
-                reject_alert = "❌ **[إشعار نظام العمليات]: تم رفض طلبك الحين.. عليك الاستفسار للمراجعة وتأكيد حسابك ثانية عبر الدعم الفني.**"
-                await context.bot.send_message(chat_id=int(target_uid), text=reject_alert, parse_mode="Markdown")
-            except Exception: pass
+        await query.edit_message_text(text=f"{query.message.text}\n\n🔴 **تم رفض الطلب وإرسال إشعار المراجعة للمستخدم فوراً.**")
+        try:
+            reject_alert = "❌ **[إشعار نظام العمليات]: تم رفض طلبك الحين.. عليك الاستفسار للمراجعة وتأكيد حسابك ثانية عبر الدعم الفني.**"
+            await context.bot.send_message(chat_id=int(target_uid), text=reject_alert, parse_mode="Markdown")
+        except Exception: pass
 
 async def handle_text_buttons(update: Update, context):
     text = update.message.text
     user_id = update.effective_user.id
     global SIGNAL_CHAT_ID
     
+    # 🔥 حقن التعديل الملوكي: إلحاق أزرار التفعيل الفوري مع رسائل الدعم الفني كمان الحين!
     if context.user_data.get('awaiting_support'):
         context.user_data['awaiting_support'] = False
         user = update.effective_user
@@ -365,11 +343,19 @@ async def handle_text_buttons(update: Update, context):
             f"🎭 **اسم المستخدم:** {username}\n"
             f"📝 **نص الرسالة:**\n{text}\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"💡 *إجراء لليدر:* اضغط على يوزر العميل وتواصل معاه دغري الحين الحين الحين."
+            f"💡 *إجراء لليدر:* إذا كانت الرسالة عبارة عن ID، يمكنك الضغط على زر التفعيل بالأسفل فوراً الحين."
         )
+        
+        # ربط الكيبورد الشفاف برسائل الدعم لحل المشكلة كلياً الحين
+        keyboard = [
+            [InlineKeyboardButton("🟢 تأكيد واعتماد VIP", callback_data=f"approve_{user.id}"),
+             InlineKeyboardButton("🔴 رفض الطلب", callback_data=f"reject_{user.id}")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
         if SIGNAL_CHAT_ID:
-            try: await context.bot.send_message(chat_id=SIGNAL_CHAT_ID, text=support_payload, parse_mode="Markdown")
-            except Exception: await context.bot.send_message(chat_id=SIGNAL_CHAT_ID, text=support_payload)
+            try: await context.bot.send_message(chat_id=SIGNAL_CHAT_ID, text=support_payload, parse_mode="Markdown", reply_markup=reply_markup)
+            except Exception: await context.bot.send_message(chat_id=SIGNAL_CHAT_ID, text=support_payload, reply_markup=reply_markup)
             await update.message.reply_text("✅ **تم إرسال رسالتك وتوجيهها فوراً لغرفة عمليات الوكالة، سيتم الرد عليك دغري الحين يا وحش!**")
         else:
             await update.message.reply_text("⚠️ خطأ صيانة: جروب الاستقبال غير مفعل الحين، يرجى كتابة `/setup_signals` بالجروب أولاً.")
@@ -408,7 +394,7 @@ async def handle_text_buttons(update: Update, context):
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         if SIGNAL_CHAT_ID:
-            try: await context.bot.send_message(chat_id=admin_payload, text=admin_payload, parse_mode="Markdown", reply_markup=reply_markup)
+            try: await context.bot.send_message(chat_id=SIGNAL_CHAT_ID, text=admin_payload, parse_mode="Markdown", reply_markup=reply_markup)
             except Exception: await context.bot.send_message(chat_id=SIGNAL_CHAT_ID, text=admin_payload, reply_markup=reply_markup)
             await update.message.reply_text("✅ **تم رفع الـ ID مالتك لغرفة مراجعة الإدارة بنجاح! جاري فحص حسابك وتفعيله الحين مدى الحياة، انتظر إشعار القبول الفوري الحين بالخاص.**")
         else:
