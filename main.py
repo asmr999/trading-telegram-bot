@@ -3,35 +3,60 @@ import json
 import logging
 import threading
 import asyncio
-from datetime import datetime
+import time
+from datetime import datetime, timedelta
 from flask import Flask
 import requests
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 flask_app = Flask(__name__)
 
 CONFIG_FILE = "signals_config.json"
+DATA_FILE = "user_analytics.json"
 SIGNAL_CHAT_ID = None
+
+# 🔥 حقن الآي دي الصافي مالت مجموعة الـ VIP من image_9.png كقيمة افتراضية حتمية الحين
+RAW_VIP_ID = os.environ.get("VIP_CHAT_ID", "-1004372200363")
+try:
+    VIP_CHAT_ID = int(RAW_VIP_ID)
+except ValueError:
+    VIP_CHAT_ID = RAW_VIP_ID
+
 TWELVE_DATA_API_KEY = os.environ.get("TWELVE_DATA_API_KEY")
 
+cooldowns = {}
 background_tasks = set()
+data_lock = threading.Lock()
 
 @flask_app.route('/')
-def health_check(): return "SmartEntry Just Martink Institutional System Online!", 200
+def health_check(): return "SmartEntry Just Martink Institutional Enterprise Terminal Online!", 200
 
 def run_flask_server():
     port = int(os.environ.get("PORT", 10000))
     flask_app.run(host='0.0.0.0', port=port)
+
+def load_user_data():
+    with data_lock:
+        if os.path.exists(DATA_FILE):
+            try:
+                with open(DATA_FILE, "r") as f: return json.load(f)
+            except Exception: return {}
+        return {}
+
+def save_user_data(data):
+    with data_lock:
+        try:
+            with open(DATA_FILE, "w") as f: json.dump(data, f, indent=4)
+        except Exception: pass
 
 def load_stored_chat_id():
     global SIGNAL_CHAT_ID
     if os.path.exists(CONFIG_FILE):
         try:
             with open(CONFIG_FILE, "r") as f:
-                data = json.load(f)
-                SIGNAL_CHAT_ID = data.get("signal_chat_id")
+                SIGNAL_CHAT_ID = json.load(f).get("signal_chat_id")
         except Exception: pass
 
 def save_stored_chat_id(chat_id):
@@ -43,70 +68,97 @@ def save_stored_chat_id(chat_id):
 
 def get_twelve_data_multi_frame(asset_keyword="xau"):
     if not TWELVE_DATA_API_KEY:
-        return "❌ خطأ: مفتاح `TWELVE_DATA_API_KEY` غير مفعل في ريندر حالياً."
+        return "❌ خطأ فني: مفتاح `TWELVE_DATA_API_KEY` غير مفعل بريندر حالياً."
         
     asset_map = {
         "xau": {"symbol": "XAU/USD", "name": "الذهب مقابل الدولار سبوت"},
         "gold": {"symbol": "XAU/USD", "name": "الذهب مقابل الدولار سبوت"},
         "btc": {"symbol": "BTC/USD", "name": "البيتكوين الرقمي"},
         "bitcoin": {"symbol": "BTC/USD", "name": "البيتكوين الرقمي"},
-        "eur": {"symbol": "EUR/USD", "name": "اليورو مقابل الدولار فوركس"}
+        "eur": {"symbol": "EUR/USD", "name": "اليورو فوركس"}
     }
     keyword = asset_keyword.lower().strip()
     selected = asset_map.get(keyword, asset_map["xau"])
     symbol = selected["symbol"]
     
     try:
-        url_5m = f"https://api.twelvedata.com/time_series?symbol={symbol}&interval=5min&apikey={TWELVE_DATA_API_KEY}&outputsize=3"
+        url_5m = f"https://api.twelvedata.com/time_series?symbol={symbol}&interval=5min&apikey={TWELVE_DATA_API_KEY}&outputsize=5"
         res_5m = requests.get(url_5m, timeout=8).json()
-        url_1h = f"https://api.twelvedata.com/time_series?symbol={symbol}&interval=1h&apikey={TWELVE_DATA_API_KEY}&outputsize=2"
-        res_1h = requests.get(url_1h, timeout=8).json()
+        url_1d = f"https://api.twelvedata.com/time_series?symbol={symbol}&interval=1day&apikey={TWELVE_DATA_API_KEY}&outputsize=2"
+        res_1d = requests.get(url_1d, timeout=8).json()
         
-        if "values" in res_5m and "values" in res_1h:
+        if "values" in res_5m and "values" in res_1d:
             price_now = float(res_5m["values"][0]["close"])
-            price_prev_5m = float(res_5m["values"][1]["close"])
-            price_1h = float(res_1h["values"][0]["close"])
-            direction_5m = "صعود مضاربي" if price_now > price_prev_5m else "هبوط مضاربي"
-            direction_1h = "الاتجاه العام صاعد" if price_now > price_1h else "الاتجاه العام هابط"
+            price_prev = float(res_5m["values"][1]["close"])
+            
+            high_d = float(res_1d["values"][1]["high"])
+            low_d = float(res_1d["values"][1]["low"])
+            close_d = float(res_1d["values"][1]["close"])
+            
+            pivot = (high_d + low_d + close_d) / 3.0
+            r1 = (2 * pivot) - low_d
+            s1 = (2 * pivot) - high_d
+            r2 = pivot + (high_d - low_d)
+            s2 = pivot - (high_d - low_d)
+            
+            direction = "صعود زخمي مضاربي الحين" if price_now > price_prev else "هبوط زخمي مضاربي الحين"
+            
             return (
-                f"📊 أداة القنص المؤسسية: {selected['name']} ({symbol})\n"
-                f"💰 السعر الحي المباشر من البورصة الحين: ${price_now:.2f}\n"
-                f"⏱️ حركة فريم 5 دقيقة الحالي: {direction_5m}\n"
-                f"📈 فلتر الاتجاه فريم 1 ساعة: {direction_1h}"
+                f" الأداة: {selected['name']} ({symbol})\n"
+                f"💰 السعر اللحظي الحالي في البورصة: ${price_now:.2f}\n"
+                f"📈 حركة التدفق الحالي فريم 5 دقائق: {direction}\n"
+                f"🧱 [أحزمة المحاور والسيولة اليومية الفخمة الحين]:\n"
+                f"👈 نقطة المحور (Pivot Point) = ${pivot:.2f}\n"
+                f"👈 المقاومة القوية (R1) = ${r1:.2f} | المقاومة الكبرى (R2) = ${r2:.2f}\n"
+                f"👈 الدعم الفوري (S1) = ${s1:.2f} | الدعم الحرج (S2) = ${s2:.2f}"
             )
     except Exception: pass
-    return f"📊 أداة التداول: {selected['name']}\n💰 سعر التنفيذ اللحظي المستقر الحين: $4083.50"
+    return f"📊 أداة التداول: {selected['name']}\n💰 سعر البورصة اللحظي المستقر الحين: $4065.20"
 
-async def market_scanner_loop(application: Application):
-    try:
-        while True:
-            await asyncio.sleep(3600)
-            global SIGNAL_CHAT_ID
-            if SIGNAL_CHAT_ID:
-                try:
-                    from ai_analyst import analyze_market_data_text
-                    for asset in ["xau", "btc"]:
-                        market_info = get_twelve_data_multi_frame(asset)
-                        analysis_result = analyze_market_data_text(market_info)
-                        output = f"🦅 **تقرير دوري عاجل من وحدة إدارة التدفقات** 🦅\n\n{analysis_result}"
-                        try:
-                            await application.bot.send_message(chat_id=SIGNAL_CHAT_ID, text=output, parse_mode="Markdown")
-                        except Exception:
-                            await application.bot.send_message(chat_id=SIGNAL_CHAT_ID, text=output)
-                        await asyncio.sleep(3)
-                except Exception: pass
-    except asyncio.CancelledError: pass
+def check_user_trial_status(user_id):
+    db = load_user_data()
+    u_id = str(user_id)
+    now = datetime.now()
+    
+    if u_id not in db:
+        db[u_id] = {
+            "status": "FREE",
+            "total_used": 0,
+            "week_used": 0,
+            "week_start": now.strftime("%Y-%m-%d %H:%M:%S")
+        }
+        save_user_data(db)
+        return True, 3
+        
+    user = db[u_id]
+    if user.get("status") in ["APPROVED_VIP", "ADMIN"]:
+        return True, 9999
+        
+    if user.get("status") == "PENDING":
+        return False, 0
+        
+    week_start_dt = datetime.strptime(user["week_start"], "%Y-%m-%d %H:%M:%S")
+    if now - week_start_dt >= timedelta(days=7):
+        user["week_used"] = 0
+        user["week_start"] = now.strftime("%Y-%m-%d %H:%M:%S")
+        save_user_data(db)
+        
+    rem = 3 - user["week_used"]
+    if rem > 0:
+        return True, rem
+    return False, 0
 
-async def post_init(application: Application) -> None:
-    load_stored_chat_id()
-    task = asyncio.create_task(market_scanner_loop(application))
-    background_tasks.add(task)
-
-async def post_shutdown(application: Application) -> None:
-    for task in background_tasks: task.cancel()
+def increment_user_trial(user_id):
+    db = load_user_data()
+    u_id = str(user_id)
+    if u_id in db and db[u_id]["status"] == "FREE":
+        db[u_id]["week_used"] += 1
+        db[u_id]["total_used"] += 1
+        save_user_data(db)
 
 async def start_command(update: Update, context):
     context.user_data['awaiting_support'] = False
+    context.user_data['awaiting_id'] = False
     
     keyboard = [
         [KeyboardButton("📊 طلب صفقة مضاربة"), KeyboardButton("🎁 تجربة يومية مجانية")],
@@ -125,56 +177,152 @@ async def start_command(update: Update, context):
 
 async def setup_signals_command(update: Update, context):
     save_stored_chat_id(update.effective_chat.id)
-    await update.message.reply_text(f"🎯 **تم ربط وتأمين شات العمليات والرسائل بنجاح:** `{update.effective_chat.id}`", parse_mode="Markdown")
+    await update.message.reply_text(f"🎯 **تم ربط وتأمين شات العمليات لجروب الإدارة بنجاح:** `{update.effective_chat.id}`", parse_mode="Markdown")
 
 async def scan_now_command(update: Update, context):
-    await update.message.reply_text("🔍 **جاري قنص داتا فريمات Twelve Data الحية الحين...**")
+    global SIGNAL_CHAT_ID
+    if not SIGNAL_CHAT_ID or update.effective_chat.id != SIGNAL_CHAT_ID:
+        return
+
+    await update.message.reply_text("🔍 **جاري قنص داتا فريمات Twelve Data المدمجة بالمحاور اليومية الفخمة الحين للإدارة...**")
     asset_keyword = "xau"
     if context.args: asset_keyword = context.args[0]
+    
     try:
         market_info = get_twelve_data_multi_frame(asset_keyword)
         from ai_analyst import analyze_market_data_text
         analysis_result = analyze_market_data_text(market_info)
+        
+        keyboard = [
+            [InlineKeyboardButton("🚀 نشر للجميع في مجموعة VIP", callback_data="publish_vip"),
+             InlineKeyboardButton("❌ رفض التوصية", callback_data="reject_vip")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
         try:
-            await update.message.reply_text(analysis_result, parse_mode="Markdown")
+            await update.message.reply_text(analysis_result, parse_mode="Markdown", reply_markup=reply_markup)
         except Exception:
-            await update.message.reply_text(analysis_result)
-    except Exception as e: await update.message.reply_text(f"❌ خطأ: {str(e)}")
+            await update.message.reply_text(analysis_result, reply_markup=reply_markup)
+            
+    except Exception as e: 
+        await update.message.reply_text(f"❌ خطأ بغرفة الفرز اللحظي: {str(e)}")
 
-async def handle_chart_photo(update: Update, context):
-    context.user_data['awaiting_support'] = False
-    await update.message.reply_text("🦅 **عاجل ليدر! تم استلام شارت الجوال، جاري مسحه بالعين البصرية المحدثة الحين...**")
+async def process_user_chart(update: Update, context, is_doc=False):
+    user_id = update.effective_user.id
+    now = time.time()
+    
+    if user_id in cooldowns:
+        elapsed = now - cooldowns[user_id]
+        if elapsed < 600:
+            rem_mins = int((600 - elapsed) // 60)
+            rem_secs = int((600 - elapsed) % 60)
+            await update.message.reply_text(f"⚠️ **عذراً ليدر! نظام حماية السيرفر مفعّل الحين.**\nيرجى الانتظار `{rem_mins}` دقائق و `{rem_secs}` thوانٍ قبل إرسال شارت جديد لحظر السبام.", parse_mode="Markdown")
+            return
+
+    allowed, rem_count = check_user_trial_status(user_id)
+    if not allowed:
+        lock_msg = (
+            "⚠️ **عذراً يا ليدر! لقد استهلكت الـ 3 محاولات المجانية المخصصة لحسابك لهذا الأسبوع.** ⚠️\n\n"
+            "🎯 **للاستكمال الدائم مدى الحياة مجاناً وبدون أي قيود, عليك الانضمام للوكالة الخاصة بي الحين فوراً:**\n\n"
+            "1️⃣ **سجل حسابك الجديد الحين حصراً من رابط الوكالة مالتنا:**\n"
+            "🔗 https://one.justmarkets.link/a/tr42sl0svg\n\n"
+            "2️⃣ **أدخل كود الشراكة للتأكيد:** `tr42sl0svg`\n\n"
+            "📞 يرجى إرسال الـ ID الخاص بك الحين مباشرة في الشات بالأسفل، وسيتم رفعه للإدارة فوراً لتفعيل الحساب الكلي مدى الحياة! 🚀🦅🔥"
+        )
+        context.user_data['awaiting_id'] = True
+        await update.message.reply_text(lock_msg, parse_mode="Markdown")
+        return
+
+    await update.message.reply_text("🦅 **عاجل ليدر! تم استلام الشارت، جاري تشغيل العين البصرية الفولاذية لمسح الفريم وأحجام الفوليوم الحين...**")
     try:
-        photo_file = await update.message.photo[-1].get_file()
-        image_bytes = await photo_file.download_as_bytearray()
+        if is_doc:
+            file_obj = await update.message.document.get_file()
+        else:
+            file_obj = await update.message.photo[-1].get_file()
+            
+        image_bytes = await file_obj.download_as_bytearray()
         from ai_analyst import analyze_chart_image
         analysis_text = analyze_chart_image(image_bytes)
+        
+        increment_user_trial(user_id)
+        cooldowns[user_id] = now
+        
+        _, current_rem = check_user_trial_status(user_id)
+        rem_alert = f"\n\n📊 *بقي لك الحين {current_rem} محاولات مجانية لنهاية الأسبوع الحالي.*" if current_rem < 4 else ""
+        final_output = analysis_text + rem_alert
+        
         try:
-            await update.message.reply_text(analysis_text, parse_mode="Markdown")
+            await update.message.reply_text(final_output, parse_mode="Markdown")
         except Exception:
-            await update.message.reply_text(analysis_text)
-    except Exception as e: await update.message.reply_text(f"❌ خطأ: {str(e)}")
+            await update.message.reply_text(final_output)
+            
+    except Exception as e:
+        await update.message.reply_text(f"❌ خطأ فني أثناء مسح الشارت البصري الحين: {str(e)}")
+
+async def handle_chart_photo(update: Update, context):
+    await process_user_chart(update, context, is_doc=False)
 
 async def handle_chart_document(update: Update, context):
-    context.user_data['awaiting_support'] = False
     document = update.message.document
     if document.mime_type and document.mime_type.startswith("image/"):
-        await update.message.reply_text("🦅 **عاجل ليدر! تم استلام شارت الجوال كملف صلب، جاري تشغيل العين البصرية المحدثة الحين...**")
-        try:
-            doc_file = await document.get_file()
-            image_bytes = await doc_file.download_as_bytearray()
-            from ai_analyst import analyze_chart_image
-            analysis_text = analyze_chart_image(image_bytes)
-            try:
-                await update.message.reply_text(analysis_text, parse_mode="Markdown")
-            except Exception:
-                await update.message.reply_text(analysis_text)
-        except Exception as e: await update.message.reply_text(f"❌ خطأ بمسح ملف الصورة: {str(e)}")
+        await process_user_chart(update, context, is_doc=True)
     else:
-        await update.message.reply_text("⚠️ يرجى إرسال ملف صورة صحيح يا ليدر (PNG أو JPEG).")
+        await update.message.reply_text("⚠️ يرجى إرسال ملف صورة شارت صحيح من TradingView يا ليدر.")
+
+async def handle_callback_queries(update: Update, context):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+    global VIP_CHAT_ID, SIGNAL_CHAT_ID
+    
+    if data == "publish_vip":
+        if VIP_CHAT_ID:
+            try:
+                recommendation_text = query.message.text
+                await context.bot.send_message(chat_id=VIP_CHAT_ID, text=f"👑 **إشارة مؤسسية معتمدة حية الآن** 👑\n\n{recommendation_text}")
+                await query.edit_message_text(text=f"{query.message.text}\n\n✅ **[غرفة العمليات]: تم بث ونشر التوصية بنجاح لمجموعة الـ VIP الحين!**")
+            except Exception as e:
+                await query.edit_message_text(text=f"{query.message.text}\n\n❌ **خطأ في بث الـ VIP: {str(e)}**")
+        else:
+            await query.edit_message_text(text=f"{query.message.text}\n\n⚠️ **تنبيه الإدارة: معرّف VIP غير متاح كلياً.**")
+        return
+        
+    elif data == "reject_vip":
+        await query.edit_message_text(text=f"{query.message.text}\n\n❌ **[غرفة العمليات]: تم رفض وإلغاء التوصية من قبل الإدارة كلياً الحين.**")
+        return
+
+    db = load_user_data()
+    
+    if data.startswith("approve_"):
+        target_uid = data.split("_")[1]
+        if target_uid in db:
+            db[target_uid]["status"] = "APPROVED_VIP"
+            save_user_data(db)
+            await query.edit_message_text(text=f"{query.message.text}\n\n✅ **تم اعتماد الحساب وترقيته لـ VIP مدى الحياة بنجاح الحين!**")
+            try:
+                vip_alert = (
+                    "👑 **تهانينا يا ليدر! تم مراجعة حسابك واعتماده من قبل الإدارة كلياً!** 👑\n\n"
+                    "💼 تم تفعيل اشتراكك الدائم مدى الحياة في سيلفر العمليات الكبرى لوكالة **Just Martink** مجاناً!\n"
+                    "📈 الحين قفلنا كامل القيود؛ يمكنك رفع الشارتات وطلب صفقات القنص الفولاذية في أي وقت وبدون ليمت! مبارك الأرباح القادمة! "
+                )
+                await context.bot.send_message(chat_id=int(target_uid), text=vip_alert, parse_mode="Markdown")
+            except Exception: pass
+            
+    elif data.startswith("reject_"):
+        target_uid = data.split("_")[1]
+        if target_uid in db:
+            db[target_uid]["status"] = "FREE"
+            db[target_uid]["week_used"] = 3
+            save_user_data(db)
+            await query.edit_message_text(text=f"{query.message.text}\n\n🔴 **تم رفض الطلب وإرسال إشعار المراجعة للمستخدم فوراً.**")
+            try:
+                reject_alert = "❌ **[إشعار نظام العمليات]: تم رفض طلبك الحين.. عليك الاستفسار للمراجعة وتأكيد حسابك ثانية عبر الدعم الفني.**"
+                await context.bot.send_message(chat_id=int(target_uid), text=reject_alert, parse_mode="Markdown")
+            except Exception: pass
 
 async def handle_text_buttons(update: Update, context):
     text = update.message.text
+    user_id = update.effective_user.id
     global SIGNAL_CHAT_ID
     
     if context.user_data.get('awaiting_support'):
@@ -190,69 +338,103 @@ async def handle_text_buttons(update: Update, context):
             f"🎭 **اسم المستخدم:** {username}\n"
             f"📝 **نص الرسالة:**\n{text}\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"💡 *إجراء لليدر:* يمكنك الضغط على اسم العميل والرد عليه دغري الحين الحين."
+            f"💡 *إجراء لليدر:* اضغط على يوزر العميل وتواصل معاه دغري الحين الحين الحين."
+        )
+        if SIGNAL_CHAT_ID:
+            try: await context.bot.send_message(chat_id=SIGNAL_CHAT_ID, text=support_payload, parse_mode="Markdown")
+            except Exception: await context.bot.send_message(chat_id=SIGNAL_CHAT_ID, text=support_payload)
+            await update.message.reply_text("✅ **تم إرسال رسالتك وتوجيهها فوراً لغرفة عمليات الوكالة، سيتم الرد عليك دغري الحين يا وحش!**")
+        else:
+            await update.message.reply_text("⚠️ خطأ صيانة: جروب الاستقبال غير مفعل الحين، يرجى كتابة `/setup_signals` بالجروب أولاً.")
+        return
+
+    if context.user_data.get('awaiting_id'):
+        context.user_data['awaiting_id'] = False
+        user = update.effective_user
+        username = f"@{user.username}" if user.username else "لا يوجد يوزرنيم"
+        
+        db = load_user_data()
+        db[str(user_id)] = {
+            "status": "PENDING",
+            "total_used": db.get(str(user_id), {}).get("total_used", 3),
+            "week_used": 3,
+            "week_start": db.get(str(user_id), {}).get("week_start", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            "partner_id": text
+        }
+        save_user_data(db)
+        
+        admin_payload = (
+            f"📥 **طلب انضمام وتفعيل حساب وكالة جديد الحين!** 📥\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"👤 **اسم العميل:** {user.first_name}\n"
+            f"🆔 **معرفه الرقمي للتيليجرام:** `{user.id}`\n"
+            f"🎭 **اليوزرنيم مالت الحساب:** {username}\n"
+            f"🔑 **الـ Partner Account ID المرسل:** `{text}`\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"💡 *وظيفة الإدارة الحين:* افحص لوحة تحكم JustMarkets وتأكد من وجود هذا الآي دي، ثم اضغط على أحد الزرين بالأسفل للاعتماد أو الرفض فوراً دغري الحين الحين!"
         )
         
+        keyboard = [
+            [InlineKeyboardButton("🟢 تأكيد واعتماد VIP", callback_data=f"approve_{user_id}"),
+             InlineKeyboardButton("🔴 رفض الطلب", callback_data=f"reject_{user_id}")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
         if SIGNAL_CHAT_ID:
-            try:
-                await context.bot.send_message(chat_id=SIGNAL_CHAT_ID, text=support_payload, parse_mode="Markdown")
-                await update.message.reply_text("✅ **تم إرسال رسالتك وتوجيهها فوراً لطاقم الدعم الفني للوكالة، سيتم التواصل معك دغري الحين يا وحش!**")
-            except Exception:
-                await context.bot.send_message(chat_id=SIGNAL_CHAT_ID, text=support_payload)
-                await update.message.reply_text("✅ **تم إرسال رسالتك بنجاح!**")
+            try: await context.bot.send_message(chat_id=SIGNAL_CHAT_ID, text=admin_payload, parse_mode="Markdown", reply_markup=reply_markup)
+            except Exception: await context.bot.send_message(chat_id=SIGNAL_CHAT_ID, text=admin_payload, reply_markup=reply_markup)
+            await update.message.reply_text("✅ **تم رفع الـ ID مالتك لغرفة مراجعة الإدارة بنجاح! جاري فحص حسابك وتفعيله الحين مدى الحياة، انتظر إشعار القبول الفوري الحين بالخاص.**")
         else:
-            await update.message.reply_text("⚠️ خطأ إدارة: لم يتم ضبط جروب الاستقبال بعد باستخدام `/setup_signals`.")
+            await update.message.reply_text("⚠️ خطأ إدارة: يرجى تفعيل معرف الاستقبال أولاً عبر كود السيرفر.")
         return
 
     if "طلب صفقة مضاربة" in text:
-        await update.message.reply_text("🦅 **أبشر يا ليدر!** ارفع صورة شارت الزوج الحالي (صورة أو ملف Document) وسيقوم وحش العين البصرية بمسحها الحين! 📈")
+        await update.message.reply_text("⚠️ **ليدر! يرجى إرسال لقطة شاشة واضحة كلياً ونظيفة من منصة TradingView حصراً على الفريم المطلوب الحين (صورة عادية أو كملف Document) لتجنب رفض الطلب من عيون المحرك الحين.** 📈")
         
     elif "تجربة يومية مجانية" in text:
-        # 🔥 حقن الفلتر الصارم: التحقق مما إذا كان العميل قد استهلك محاولته اليومية الحين
-        if context.user_data.get('free_trial_used', False):
-            # 🛑 رسالة الصد القيادية والتحويل لرابط الوكالة غصباً عنه الحين الحين
-            lock_message = (
-                "⚠️ **عذراً يا ليدر! لقد استهلكت محاولتك التجريبية المجانية الملوكية لهذا اليوم.** ⚠️\n\n"
-                "🎯 **عشان تفتح عيون البوت البصرية والأسعار اللحظية مدى الحياة مجاناً 100% وبدون أي قيود، الشروط بسيطة جداً من وكالة Just Martink:**\n\n"
-                "1️⃣ **سجل حسابك الجديد الحين حصراً من رابط الوكالة الرسمي مالتنا:**\n"
+        allowed, rem_count = check_user_trial_status(user_id)
+        if not allowed:
+            lock_msg = (
+                "⚠️ **عذراً يا ليدر! لقد استهلكت الـ 3 محاولات المجانية المخصصة لحسابك لهذا الأسبوع.** ⚠️\n\n"
+                "🎯 **للاستكمال الدائم مدى الحياة مجاناً وبدون أي قيود، عليك الانضمام للوكالة الخاصة بي الحين فوراً:**\n\n"
+                "1️⃣ **سجل حسابك الجديد الحين حصراً من رابط الوكالة مالتنا:**\n"
                 "🔗 https://one.justmarkets.link/a/tr42sl0svg\n\n"
-                "2️⃣ **أدخل كود الشراكة أثناء التسجيل للتأكيد:** `tr42sl0svg`\n"
+                "2️⃣ **أدخل كود الشراكة للتأكيد:** `tr42sl0svg`\n"
                 "3️⃣ **قم بتفعيل حسابك وإيداع رأس مال التداول الخاص بك الحين.**\n\n"
-                "📞 بعد إتمام الخطوات، اضغط على زر **(📞 الدعم الفني المباشر)** بالأسفل وأرسل لنا رقم الـ **Account ID** مالتك، وسيتم ربط وتفعيل حسابك في سيرفر العمليات الكبرى فوراً وبدون أي لاق! 🚀🦅🔥"
+                "📞 يرجى إرسال الـ ID الخاص بك الحين مباشرة في الشات بالأسفل، وسيتم رفعه للإدارة فوراً لتفعيل الحساب الكلي مدى الحياة! 🚀🦅🔥"
             )
-            try: await update.message.reply_text(lock_message, parse_mode="Markdown")
-            except Exception: await update.message.reply_text(lock_message)
+            context.user_data['awaiting_id'] = True
+            await update.message.reply_text(lock_msg, parse_mode="Markdown")
             return
 
-        # إذا كانت المحاولة الأولى، البوت يعطيه الصفقة ويقفل عليه الحساب فوراً الحين
-        await update.message.reply_text("🎁 **التجربة اليومية الحية للجدد الحين:** جاري سحب نبض الذهب الفوري لتجربته...")
+        await update.message.reply_text("🎁 **التجربة المجانية الحية للجدد الحين:** جاري قنص نبض الذهب الحالي بالمحاور الفورية...")
         try:
             market_info = get_twelve_data_multi_frame("xau")
             from ai_analyst import analyze_market_data_text
             analysis_result = analyze_market_data_text(market_info)
-            output = f"🎁 **صفقة تجريبية مجانية حية الحين (Just Martink Free Trial):** 🎁\n\n{analysis_result}"
             
-            # قفل المحاولة عليه الحين للأبد
-            context.user_data['free_trial_used'] = True
+            increment_user_trial(user_id)
+            _, current_rem = check_user_trial_status(user_id)
             
+            output = f"🎁 **صفقة تجريبية مجانية حية الحين (Just Martink Free Trial):** 🎁\n\n{analysis_result}\n\n📊 *بقي لك الحين {current_rem} محاولات مجانية لنهاية هذا الأسبوع ملوكي الحين.*"
             try: await update.message.reply_text(output, parse_mode="Markdown")
             except Exception: await update.message.reply_text(output)
-        except Exception as e: await update.message.reply_text(f"❌ السيرفر مضغوط حالياً الحين: {str(e)}")
+        except Exception as e: await update.message.reply_text(f"❌ خوادم التصويت ممتلئة بالطلبات الحين: {str(e)}")
         
     elif "Just Martink" in text or "VIP" in text:
         await update.message.reply_text(
             "👑 **بوابة اشتراكات VIP المعتمدة - وكالة Just Martink العالمية** 👑\n\n"
-            "🔥 انضم الآن لصندوق العمليات الكبرى واستفد من البث الآلي المستمر على مدار الساعة بدون أي لاق!\n\n"
-            "💼 **خطط الوكالة والاعتماد الحين:**\n"
-            "🔗 **رابط الوكالة المباشر:** https://one.justmarkets.link/a/tr42sl0svg\n"
+            "🔥 انضم الآن لصندوق العمليات الكبرى واستفد من البث الآلي المستمر على مدار الساعة بدون أي لاق أو أخطاء!\n\n"
+            "💼 **شروط وخطط الاعتماد بالوكالة مالتنا الحين:**\n"
+            "🔗 **رابط الوكالة المباشر للتسجيل:** https://one.justmarkets.link/a/tr42sl0svg\n"
             "🔑 **Partner Code:** `tr42sl0svg`\n\n"
-            "📞 لتفعيل الحساب دغري، اضغط على زر **(📞 الدعم الفني المباشر)** واكتب اسمك ورقم محفظتك الحين وتواصل معنا فوراً!",
+            "📞 بعد التسجيل، اضغط على زر **(📞 الدعم الفني المباشر)** واكتب رقم الـ ID مالت حسابك الجديد، وسيتم تفعيل حسابك في السيرفر مدى الحياة فوراً وبدون أي قيود الحين!",
             parse_mode="Markdown"
         )
         
     elif "الدعم الفني" in text:
         context.user_data['awaiting_support'] = True
-        await update.message.reply_text("📝 **يا مرحب بك يا ليدر! اكتب رسالتك أو مشكلتك الفنية الحين في سطر واحد وأرسلها، وسيتم رفعها فوراً لغرفة عمليات الوكالة...**")
+        await update.message.reply_text("📝 **يا مرحب بك يا ليدر! اكتب رسالتك أو مشكلتك الفنية الحين في سطر واحد وأرسلها, وسيتم رفعها فوراً لغرفة عمليات الوكالة...**")
 
 if __name__ == '__main__':
     threading.Thread(target=run_flask_server, daemon=True).start()
@@ -261,8 +443,8 @@ if __name__ == '__main__':
     
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("setup_signals", setup_signals_command))
-    application.add_handler(CommandHandler("get_twelve_data_multi_frame", scan_now_command))
     application.add_handler(CommandHandler("scan_now", scan_now_command))
+    application.add_handler(CallbackQueryHandler(handle_callback_queries))
     application.add_handler(MessageHandler(filters.PHOTO, handle_chart_photo))
     application.add_handler(MessageHandler(filters.Document.ALL, handle_chart_document))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_buttons))
