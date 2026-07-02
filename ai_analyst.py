@@ -39,12 +39,8 @@ def fetch_model_stance_and_text(provider, url, headers, payload, response_type="
         res = requests.post(url, json=payload, headers=headers, timeout=12)
         if res.status_code == 200:
             res_data = res.json()
-            if response_type == "openai":
-                choices = res_data.get('choices', [])
-                content = choices[0].get('message', {}).get('content', '') if choices else ''
-            else:
-                content = res_data.get('text', '')
-                
+            choices = res_data.get('choices', [])
+            content = choices[0].get('message', {}).get('content', '') if choices else ''
             if content:
                 stance = "HOLD"
                 if "شراء" in content or "BUY" in content.upper(): stance = "BUY"
@@ -56,12 +52,7 @@ def fetch_model_stance_and_text(provider, url, headers, payload, response_type="
 def analyze_market_data_text(indicators_text):
     votes = {"BUY": 0, "SELL": 0, "HOLD": 0}
     collected_reports = []
-    
-    full_prompt = (
-        f"{INSTITUTIONAL_PROMPT}\n\n"
-        f"[المعطيات الرقمية المفلترة لسعر السوق الحالي الحين]:\n{indicators_text}\n\n"
-        f"قم بصياغة توصية فائقة الدقة وخالية من الأخطاء الفنية كلياً الحين وبنسبة نجاح فنية واضحة."
-    )
+    full_prompt = f"{INSTITUTIONAL_PROMPT}\n\n[المعطيات الرقمية المفلترة لسعر السوق الحالي الحين]:\n{indicators_text}"
     
     if GEMINI_API_KEY:
         try:
@@ -72,22 +63,14 @@ def analyze_market_data_text(indicators_text):
             }
             res = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}, timeout=15)
             if res.status_code == 200:
-                res_json = res.json()
-                candidates = res_json.get('candidates', [])
+                candidates = res.json().get('candidates', [])
                 if candidates:
-                    parts = candidates[0].get('content', {}).get('parts', [])
-                    if parts:
-                        report = parts[0].get('text', '')
-                        if report:
-                            return report + AGENCY_SIGNATURE
+                    report = candidates[0].get('content', {}).get('parts', [{}])[0].get('text', '')
+                    if report: return report + AGENCY_SIGNATURE
         except Exception: pass
 
     if GROQ_API_KEY:
         s, t = fetch_model_stance_and_text("Groq", "https://api.groq.com/openai/v1/chat/completions", {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}, {"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": full_prompt}], "temperature": 0.0})
-        if s: votes[s] += 1; collected_reports.append(t)
-
-    if SAMBANOVA_API_KEY:
-        s, t = fetch_model_stance_and_text("SambaNova", "https://api.sambanova.ai/v1/chat/completions", {"Authorization": f"Bearer {SAMBANOVA_API_KEY}", "Content-Type": "application/json"}, {"model": "Meta-Llama-3.1-70B-Instruct", "messages": [{"role": "user", "content": full_prompt}], "temperature": 0.0})
         if s: votes[s] += 1; collected_reports.append(t)
 
     if not collected_reports:
@@ -95,33 +78,22 @@ def analyze_market_data_text(indicators_text):
 
     final_decision = max(votes, key=votes.get)
     best_report = collected_reports[0]
-    for report in collected_reports:
-        if final_decision == "BUY" and ("شراء" in report or "هدف" in report):
-            best_report = report
-            break
-        elif final_decision == "SELL" and ("بيع" in report or "مقاومة" in report):
-            best_report = report
-            break
-
-    clean_report = best_report.replace("Groq", "").replace("OpenAI", "").replace("Gemini", "").replace("Llama", "")
-    return clean_report + AGENCY_SIGNATURE
+    return best_report + AGENCY_SIGNATURE
 
 def analyze_chart_image(image_bytes):
     image_base64 = base64.b64encode(image_bytes).decode('utf-8')
-    
     vision_prompt = (
         f"{INSTITUTIONAL_PROMPT}\n\n"
         "أمامك الآن صورة شارت حية من TradingView أرسلها العميل. انظر بدقة فائقة وبدون أي أخطاء نهائياً للأركان التالية الحين:\n"
         "1. حدد اسم الأداة والفريم بوضوح من أعلى اليسار الحين.\n"
         "2. انظر لأعمدة حجم التداول (Volume Bars) بالأسفل لتأكد ما إذا كان الكسر حقيقياً ومسنوداً بسيولة مؤسسية، واحسب نسبة نجاح الصفقة فَنياً بناءً على وضوح الاتجاه وقوة السيولة الحين.\n"
-        "3. صغ التوصية ملوكي ومفلترة لسعر السوق بالملّي: حدد الاتجاه الصافي [شراء أو بيع أو انتظار]، وضَع نسبة النجاح بوضوح، وضَع سعر الدخول لحظي أو معلق بناءً على رؤية الخبراء، "
-        "واكتب الأهداف والاستوب لوز وقاعدة الأمان والملاحظة القوية الحين كلياً."
+        "3. صغ التوصية ملوكي ومفلترة لسعر السوق بالملّي."
     )
 
     if GEMINI_API_KEY:
         try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
-            # 🔥 التثبيت والإصلاح الفولاذي الشامل: تفعيل بنية الـ camelCase الحتمية المطلوبة برمجياً الحين
+            # 🔥 التثبيت والإصلاح الفولاذي الشامل: تفعيل بنية الـ camelCase الحتمية لجوجل (inlineData و mimeType و generationConfig) الحين الحين
             payload = {
                 "contents": [{
                     "parts": [
@@ -133,14 +105,10 @@ def analyze_chart_image(image_bytes):
             }
             res = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}, timeout=30)
             if res.status_code == 200:
-                res_json = res.json()
-                candidates = res_json.get('candidates', [])
+                candidates = res.json().get('candidates', [])
                 if candidates:
-                    parts = candidates[0].get('content', {}).get('parts', [])
-                    if parts:
-                        text_result = parts[0].get('text', '')
-                        if text_result:
-                            return text_result + AGENCY_SIGNATURE
+                    text_result = candidates[0].get('content', {}).get('parts', [{}])[0].get('text', '')
+                    if text_result: return text_result + AGENCY_SIGNATURE
         except Exception: pass
 
     if GROQ_API_KEY:
@@ -159,12 +127,8 @@ def analyze_chart_image(image_bytes):
             }
             res = requests.post(url, json=payload, headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}, timeout=15)
             if res.status_code == 200:
-                res_data = res.json()
-                choices = res_data.get('choices', [])
-                if choices:
-                    content = choices[0].get('message', {}).get('content', '')
-                    if content:
-                        return content.replace("Groq", "").replace("Llama", "") + AGENCY_SIGNATURE
+                content = res.json().get('choices', [{}])[0].get('message', {}).get('content', '')
+                if content: return content.replace("Groq", "").replace("Llama", "") + AGENCY_SIGNATURE
         except Exception: pass
 
     return "⚠️ **تنبيه نظام الطوارئ:** لم تتمكن محركات الرؤية من فك الرموز الحين، يرجى إعادة إرسال شارت TradingView واضح كلياً الحين ثانية."
