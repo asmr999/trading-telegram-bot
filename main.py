@@ -17,7 +17,7 @@ CONFIG_FILE = "signals_config.json"
 DATA_FILE = "user_analytics.json"
 SIGNAL_CHAT_ID = None
 
-# 🔥 حقن الآي دي الصافي مالت مجموعة الـ VIP من image_9.png كقيمة افتراضية حتمية الحين
+# حقن الآي دي الصافي مالت مجموعة الـ VIP كقيمة افتراضية حتمية الحين
 RAW_VIP_ID = os.environ.get("VIP_CHAT_ID", "-1004372200363")
 try:
     VIP_CHAT_ID = int(RAW_VIP_ID)
@@ -156,6 +156,31 @@ def increment_user_trial(user_id):
         db[u_id]["total_used"] += 1
         save_user_data(db)
 
+async def market_scanner_loop(application: Application):
+    try:
+        while True:
+            await asyncio.sleep(3600)
+            global SIGNAL_CHAT_ID
+            if SIGNAL_CHAT_ID:
+                try:
+                    from ai_analyst import analyze_market_data_text
+                    for asset in ["xau", "btc"]:
+                        market_info = get_twelve_data_multi_frame(asset)
+                        analysis_result = analyze_market_data_text(market_info)
+                        output = f"🦅 **تقرير دوري عاجل من وحدة إدارة التدفقات** 🦅\n\n{analysis_result}"
+                        try:
+                            await application.bot.send_message(chat_id=SIGNAL_CHAT_ID, text=output, parse_mode="Markdown")
+                        except Exception:
+                            await application.bot.send_message(chat_id=SIGNAL_CHAT_ID, text=output)
+                        await asyncio.sleep(3)
+                except Exception: pass
+    except asyncio.CancelledError: pass
+
+async def post_init(application: Application) -> None:
+    load_stored_chat_id()
+    task = asyncio.create_task(market_scanner_loop(application))
+    background_tasks.add(task)
+
 async def start_command(update: Update, context):
     context.user_data['awaiting_support'] = False
     context.user_data['awaiting_id'] = False
@@ -216,7 +241,7 @@ async def process_user_chart(update: Update, context, is_doc=False):
         if elapsed < 600:
             rem_mins = int((600 - elapsed) // 60)
             rem_secs = int((600 - elapsed) % 60)
-            await update.message.reply_text(f"⚠️ **عذراً ليدر! نظام حماية السيرفر مفعّل الحين.**\nيرجى الانتظار `{rem_mins}` دقائق و `{rem_secs}` thوانٍ قبل إرسال شارت جديد لحظر السبام.", parse_mode="Markdown")
+            await update.message.reply_text(f"⚠️ **عذراً ليدر! نظام حماية السيرفر مفعّل الحين.**\nيرجى الانتظار `{rem_mins}` دقائق و `{rem_secs}` ثوانٍ قبل إرسال شارت جديد لحظر السبام.", parse_mode="Markdown")
             return
 
     allowed, rem_count = check_user_trial_status(user_id)
@@ -434,12 +459,12 @@ async def handle_text_buttons(update: Update, context):
         
     elif "الدعم الفني" in text:
         context.user_data['awaiting_support'] = True
-        await update.message.reply_text("📝 **يا مرحب بك يا ليدر! اكتب رسالتك أو مشكلتك الفنية الحين في سطر واحد وأرسلها, وسيتم رفعها فوراً لغرفة عمليات الوكالة...**")
+        await update.message.reply_text("📝 **يا مرحب بك يا ليدر! اكتب رسالتك أو مشكلتك الفنية الحين في سطر واحد وأرسلها، وسيتم رفعها فوراً لغرفة عمليات الوكالة...**")
 
 if __name__ == '__main__':
     threading.Thread(target=run_flask_server, daemon=True).start()
     TOKEN = os.environ.get("BOT_TOKEN", "8518436165:AAH2-DjOv0lh9EPpeatvKhAIX-1ODvvvIfY")
-    application = Application.builder().token(TOKEN).post_init(post_init).post_shutdown(post_shutdown).build()
+    application = Application.builder().token(TOKEN).post_init(post_init).build()
     
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("setup_signals", setup_signals_command))
