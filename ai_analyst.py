@@ -73,13 +73,15 @@ def analyze_market_data_text(indicators_text):
     )
 
 def analyze_chart_image(image_bytes):
-    """👁️ العين البصرية المستقرة: قراءة شارتات الآيفون بالترميز الصحيح الحين لحظر أخطاء 404 كلياً"""
+    """👁️ العين البصرية الإنتاجية: قراءة شارتات الآيفون بالمسار الصافي v1 لحرق خطأ 404 كلياً للأبد"""
     if not GEMINI_API_KEY:
         return "❌ خطأ سيرفر: يرجى تزويد ريندر بمفتاح `GEMINI_API_KEY` المجاني لتفعيل العين البصرية للشارتات الحين."
         
     try:
         image_base64 = base64.b64encode(image_bytes).decode('utf-8')
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        
+        # 🔥 الإغلاق الصارم: الانتقال إلى رابط الإنتاج الرسمي المستقر v1 وحذف كلمة beta تماماً
+        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
         
         vision_prompt = (
             "You are the Head of Technical Analysis at SmartEntry Global Fund. Look carefully at this screenshot image of a financial chart from the user's mobile.\n"
@@ -90,7 +92,6 @@ def analyze_chart_image(image_bytes):
             "3. Visual structural justification from the candles."
         )
         
-        # 🔥 الإغلاق الحتمي: تعديل الحقول لـ snake_case (inline_data و mime_type) لتوافق معايير جوجل الرسمية
         payload = {
             "contents": [{
                 "parts": [
@@ -98,7 +99,7 @@ def analyze_chart_image(image_bytes):
                     {"inline_data": {"mime_type": "image/jpeg", "data": image_base64}}
                 ]
             }],
-            "generationConfig": {"temperature": 0.0}
+            "generation_config": {"temperature": 0.0}
         }
         
         res = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}, timeout=15)
@@ -110,7 +111,8 @@ def analyze_chart_image(image_bytes):
             else:
                 return f"❌ خطأ: استجابة خادم الرؤية فارغة، يرجى إعادة التقاط الصورة وإرسالها الحين."
         else:
-            return f"❌ خطأ في خادم الرؤية المباشر: الرمز الداخلي للخطأ هو {res.status_code}. (تأكد من صحة وسلامة مفتاح GEMINI_API_KEY المضاف بقسم Environment في ريندر)."
+            # 🛡️ حقن نظام كاشف الأعطال الفوري: طباعة نص رد جوجل الحقيقي لمنع التخمين نهائياً
+            return f"❌ **خطأ في خادم الرؤية المباشر (كود {res.status_code}):**\n`{res.text[:140]}`\n\n💡 *إجراء فوري الحين:* تأكد من سلامة وصحة المفتاح المضاف في ريندر."
             
     except Exception as e:
         return f"❌ خطأ فني أثناء مسح الشارت البصري الحين: {str(e)[:100]}"
