@@ -181,6 +181,146 @@ def analyze_market_data_text(indicators_text):
     return clean_report + AGENCY_SIGNATURE
 
 
+def _call_vision_model(image_base64, mime_type, prompt, max_tokens_hint=None):
+    """نداء موحد للرؤية البصرية (Gemini أولاً ثم Groq) - يرجع النص أو None."""
+    if GEMINI_API_KEY:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+            payload = {
+                "contents": [{
+                    "parts": [
+                        {"text": prompt},
+                        {"inlineData": {"mimeType": mime_type, "data": image_base64}}
+                    ]
+                }],
+                "generationConfig": {"temperature": 0.0}
+            }
+            res = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}, timeout=30)
+            if res.status_code == 200:
+                candidates = res.json().get('candidates', [])
+                if candidates:
+                    parts = candidates[0].get('content', {}).get('parts', [])
+                    if parts and parts[0].get('text'):
+                        return parts[0]['text']
+            else:
+                print(f"🚨 [Gemini-vision] كود: {res.status_code} | {res.text[:300]}")
+        except Exception as e:
+            print(f"❌ [Gemini-vision] كراش: {str(e)}")
+
+    if GROQ_API_KEY:
+        try:
+            res = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                json={
+                    "model": GROQ_VISION_MODEL,
+                    "messages": [{
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{image_base64}"}}
+                        ]
+                    }],
+                    "temperature": 0.0
+                },
+                headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+                timeout=20
+            )
+            if res.status_code == 200:
+                choices = res.json().get('choices', [])
+                if choices:
+                    return choices[0].get('message', {}).get('content', '') or None
+            else:
+                print(f"🚨 [Groq-vision] كود: {res.status_code} | {res.text[:300]}")
+        except Exception as e:
+            print(f"❌ [Groq-vision] كراش: {str(e)}")
+    return None
+
+
+IDENTIFY_PROMPT = (
+    "انظر لصورة الشارت هذي فقط وحدد اسم الأداة والفريم الزمني الظاهرين بأعلى يسار الشارت.\n"
+    "أجب حصراً بهذا الشكل بالضبط بدون أي كلام إضافي:\n"
+    "SYMBOL: <رمز الأداة كما يظهر بالصورة>\n"
+    "TIMEFRAME: <الفريم مثل M5 أو M15 أو H1>"
+)
+
+GROUNDED_CHART_PROMPT_TEMPLATE = (
+    "أنت محلل فني. أمامك صورة شارت TradingView حقيقية، ومعك أيضاً أرقام مؤشرات فنية "
+    "محسوبة رياضياً فعلياً من بيانات سوق حية لنفس الأداة (وليست من تخمينك).\n"
+    "ادمج قراءتك البصرية للشارت (الشموع، الدعوم والمقاومات الظاهرة، حجم التداول) مع الأرقام "
+    "المحسوبة أدناه، واكتب تقريراً بالنقاط التالية حصراً:\n"
+    "1. نوع الأداة والفريم.\n"
+    "2. الاتجاه: اكتب حصراً أحد العناوين التالية بخط عريض: [🟢 شراء BUY] أو [🔴 بيع SELL] أو [🟡 انتظار WAIT].\n"
+    "3. 🎯 درجة التوافق الفني: استخدم فقط الرقم المعطى لك أدناه بدون أي تعديل أو اختراع رقم بديل. "
+    "اذكرها بوضوح كـ'درجة توافق فني محسوبة رياضياً' وليس 'نسبة نجاح مضمونة'.\n"
+    "4. سعر الدخول المقترح (لحظي أو معلق) بناءً على قراءتك البصرية للشارت.\n"
+    "5. الأهداف (1-2-3) ووقف الخسارة المقترحين بناءً على الدعوم/المقاومات الظاهرة بالشارت والتذبذب.\n"
+    "6. قاعدة نقل وقف الخسارة لنقطة الدخول عند تحقق الهدف الأول.\n"
+    "7. ملاحظة مختصرة تذكّر بمخاطر التداول وأن لا نتيجة مضمونة بالأسواق.\n"
+    "ممنوع أي مقدمات إنشائية أو ذكر اسم شركات الذكاء الاصطناعي.\n\n"
+    "[الأرقام المحسوبة رياضياً فعلياً لنفس الأداة]:\n{indicators_block}"
+)
+
+GROUNDED_CHART_PROMPT_NO_DATA = (
+    "أنت محلل فني. أمامك صورة شارت TradingView حقيقية فقط - ما فيه بيانات سوق حية متاحة حالياً "
+    "لهذي الأداة (رمز الأداة ما انعرف بدقة أو فشل جلب بياناته).\n"
+    "اكتب تقريراً بالنقاط التالية حصراً، بالاعتماد على القراءة البصرية للشارت فقط:\n"
+    "1. نوع الأداة والفريم كما تظهر بالصورة.\n"
+    "2. الاتجاه: اكتب حصراً أحد العناوين التالية بخط عريض: [🟢 شراء BUY] أو [🔴 بيع SELL] أو [🟡 انتظار WAIT].\n"
+    "3. ⚠️ اكتب حرفياً: 'درجة التوافق الفني: غير متاحة حالياً - يعتمد هذا التحليل على القراءة البصرية فقط "
+    "بدون تأكيد رقمي من بيانات السوق الحية'. ممنوع اختراع أي نسبة بديلة.\n"
+    "4. سعر الدخول المقترح بناءً على قراءتك البصرية للشارت.\n"
+    "5. الأهداف (1-2-3) ووقف الخسارة المقترحين بناءً على الدعوم/المقاومات الظاهرة بالشارت.\n"
+    "6. قاعدة نقل وقف الخسارة لنقطة الدخول عند تحقق الهدف الأول.\n"
+    "7. ملاحظة مختصرة تذكّر بمخاطر التداول وأن لا نتيجة مضمونة بالأسواق.\n"
+    "ممنوع أي مقدمات إنشائية أو ذكر اسم شركات الذكاء الاصطناعي."
+)
+
+
+def analyze_chart_image_grounded(image_bytes, mime_type="image/jpeg"):
+    """
+    👁️ + 📐 تحليل صورة شارت مدمج مع مؤشرات فنية حقيقية:
+    1) يسأل الموديل يحدد اسم الأداة والفريم من الصورة فقط.
+    2) يجيب مؤشرات RSI/EMA/MACD حقيقية لنفس الأداة من indicators.py.
+    3) يرجع للموديل بالصورة + الأرقام الحقيقية مع بعض لتوليد تقرير واحد مدمج.
+    لو ما قدرنا نتأكد من الأداة أو ما وصلتنا بيانات حية، ما نخترع رقم - نصرح بعدم التوفر.
+    """
+    image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+    if mime_type not in ("image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"):
+        mime_type = "image/jpeg"
+
+    # 1) تحديد الأداة من الصورة
+    identify_result = _call_vision_model(image_base64, mime_type, IDENTIFY_PROMPT)
+    symbol_raw = None
+    if identify_result:
+        for line in identify_result.splitlines():
+            if line.strip().upper().startswith("SYMBOL:"):
+                symbol_raw = line.split(":", 1)[1].strip()
+                break
+
+    # 2) جلب مؤشرات حقيقية لو قدرنا نطابق الأداة
+    from indicators import map_symbol_to_keyword, fetch_and_compute, format_indicators_for_ai
+    keyword = map_symbol_to_keyword(symbol_raw)
+    indicators_block = None
+    if keyword:
+        data, err = fetch_and_compute(keyword)
+        if data:
+            indicators_block = format_indicators_for_ai(data)
+        else:
+            print(f"⚠️ [grounded-chart] تعذر جلب مؤشرات لـ {keyword}: {err}")
+
+    # 3) التحليل النهائي المدمج
+    if indicators_block:
+        final_prompt = GROUNDED_CHART_PROMPT_TEMPLATE.format(indicators_block=indicators_block)
+    else:
+        final_prompt = GROUNDED_CHART_PROMPT_NO_DATA
+
+    result_text = _call_vision_model(image_base64, mime_type, final_prompt)
+    if result_text:
+        return result_text + AGENCY_SIGNATURE
+
+    return "⚠️ **تنبيه نظام الطوارئ:** لم تتمكن محركات الرؤية من فك الرموز الحين، يرجى إعادة إرسال شارت TradingView واضح كلياً الحين ثانية."
+
+
 def analyze_chart_image(image_bytes, mime_type="image/jpeg"):
     """👁️ فحص البث البصري - يدعم اكتشاف نوع الصورة الفعلي بدل افتراض jpeg دايماً"""
     image_base64 = base64.b64encode(image_bytes).decode('utf-8')
