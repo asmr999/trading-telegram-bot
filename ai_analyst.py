@@ -79,7 +79,7 @@ def analyze_market_data_text(indicators_text):
         if s: votes[s] += 1; collected_reports.append(t)
 
     if not collected_reports:
-        return "⚠️ **تنبيه فني الحين:** السيرفرات الرقمية تحت صيانة سريعة، يرجى إعادة المحاولة الحين."
+        return "❌ خطأ فني الحين: السيرفرات الرقمية تحت صيانة سريعة، يرجى إعادة المحاولة الحين."
 
     final_decision = max(votes, key=votes.get)
     best_report = collected_reports[0]
@@ -95,6 +95,7 @@ def analyze_market_data_text(indicators_text):
     return clean_report + AGENCY_SIGNATURE
 
 def analyze_chart_image(image_bytes):
+    """👁️ ضبط وتأمين هيكل الـ REST الـ camelCase لعام 2026 لقراءة الصور بدون أي كراش"""
     image_base64 = base64.b64encode(image_bytes).decode('utf-8')
     
     vision_prompt = (
@@ -109,11 +110,12 @@ def analyze_chart_image(image_bytes):
     if GEMINI_API_KEY:
         try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+            # 🔥 الإصلاح التاريخي: تحويل الهيكل لـ camelCase الصارم المطابق لجوجل (inlineData و mimeType) الحين
             payload = {
                 "contents": [{
                     "parts": [
                         {"text": vision_prompt},
-                        {"inline_data": {"mime_type": "image/jpeg", "data": image_base64}}
+                        {"inlineData": {"mimeType": "image/jpeg", "data": image_base64}}
                     ]
                 }],
                 "generationConfig": {"temperature": 0.0}
