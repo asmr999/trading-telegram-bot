@@ -102,6 +102,7 @@ def analyze_market_data_text(indicators_text):
     return clean_report + AGENCY_SIGNATURE
 
 def analyze_chart_image(image_bytes):
+    """👁️ فحص البث البصري لعام 2026 مع رادار كاشف الأعطال الحية في لوحة ريندر الحين"""
     image_base64 = base64.b64encode(image_bytes).decode('utf-8')
     
     vision_prompt = (
@@ -113,20 +114,24 @@ def analyze_chart_image(image_bytes):
         "واكتب الأهداف والاستوب لوز وقاعدة الأمان والملاحظة القوية الحين كلياً."
     )
 
+    # 🟢 خط الدفاع الأول: وحش جيميناي بالصيغة الهندسية الصارمة والـ camelCase
     if GEMINI_API_KEY:
         try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
-            # 🔥 الهيكل الرسمي الصحيح والمعتمد الحين: دمج الـ inline_data مع الـ generationConfig الكبرى
             payload = {
                 "contents": [{
                     "parts": [
                         {"text": vision_prompt},
-                        {"inline_data": {"mime_type": "image/jpeg", "data": image_base64}}
+                        {"inlineData": {"mimeType": "image/jpeg", "data": image_base64}}
                     ]
                 }],
                 "generationConfig": {"temperature": 0.0}
             }
             res = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}, timeout=30)
+            
+            # 🔥 كاشف الرادار: طباعة رد سيرفر جوجل فوراً في الـ Logs مالت ريندر لو انهار!
+            print(f"🚨 [رادار فحص جوجل] - كود الاستجابة: {res.status_code} | نص الرد: {res.text}")
+            
             if res.status_code == 200:
                 res_json = res.json()
                 candidates = res_json.get('candidates', [])
@@ -136,8 +141,10 @@ def analyze_chart_image(image_bytes):
                         text_result = parts[0].get('text', '')
                         if text_result:
                             return text_result + AGENCY_SIGNATURE
-        except Exception: pass
+        except Exception as e:
+            print(f"❌ كراش داخلي في دالة طلب جوجل: {str(e)}")
 
+    # 🔵 خط الدفاع الثاني البديل الفوري: وحش جروك البصري (Groq Vision) الشغال ملوكي
     if GROQ_API_KEY:
         try:
             url = "https://api.groq.com/openai/v1/chat/completions"
@@ -153,6 +160,9 @@ def analyze_chart_image(image_bytes):
                 "temperature": 0.0
             }
             res = requests.post(url, json=payload, headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}, timeout=15)
+            
+            print(f"🚨 [رادار فحص جروك] - كود الاستجابة: {res.status_code}")
+            
             if res.status_code == 200:
                 res_data = res.json()
                 choices = res_data.get('choices', [])
@@ -160,6 +170,7 @@ def analyze_chart_image(image_bytes):
                     content = choices[0].get('message', {}).get('content', '')
                     if content:
                         return content.replace("Groq", "").replace("Llama", "") + AGENCY_SIGNATURE
-        except Exception: pass
+        except Exception as e:
+            print(f"❌ كراش داخلي في دالة طلب جروك: {str(e)}")
 
     return "⚠️ **تنبيه نظام الطوارئ:** لم تتمكن محركات الرؤية من فك الرموز الحين، يرجى إعادة إرسال شارت TradingView واضح كلياً الحين ثانية."
