@@ -185,8 +185,9 @@ async def start_command(update: Update, context):
     context.user_data['awaiting_support'] = False
     context.user_data['awaiting_id'] = False
     
+    # 🔥 تنظيف وإعادة هيكلة ملوكية: حذف زر التجربة العامة نهائياً من الكيبورد الحين الحين
     keyboard = [
-        [KeyboardButton("📊 طلب صفقة مضاربة"), KeyboardButton("🎁 تجربة يومية مجانية")],
+        [KeyboardButton("📊 طلب صفقة مضاربة")],
         [KeyboardButton("👑 اشتراك VIP وكالة Just Martink"), KeyboardButton("📞 الدعم الفني المباشر")]
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -251,7 +252,8 @@ async def process_user_chart(update: Update, context, is_doc=False):
             "🎯 **للاستكمال الدائم مدى الحياة مجاناً وبدون أي قيود, عليك الانضمام للوكالة الخاصة بي الحين فوراً:**\n\n"
             "1️⃣ **سجل حسابك الجديد الحين حصراً من رابط الوكالة مالتنا:**\n"
             "🔗 https://one.justmarkets.link/a/tr42sl0svg\n\n"
-            "2️⃣ **أدخل كود الشراكة للتأكيد:** `tr42sl0svg`\n\n"
+            "2️⃣ **أدخل كود الشراكة للتأكيد:** `tr42sl0svg`\n"
+            "3️⃣ **قم بتفعيل حسابك وإيداع رأس مال التداول الخاص بك الحين.**\n\n"
             "📞 يرجى إرسال الـ ID الخاص بك الحين مباشرة في الشات بالأسفل، وسيتم رفعه للإدارة فوراً لتفعيل الحساب الكلي مدى الحياة! 🚀🦅🔥"
         )
         context.user_data['awaiting_id'] = True
@@ -406,7 +408,7 @@ async def handle_text_buttons(update: Update, context):
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         if SIGNAL_CHAT_ID:
-            try: await context.bot.send_message(chat_id=SIGNAL_CHAT_ID, text=admin_payload, parse_mode="Markdown", reply_markup=reply_markup)
+            try: await context.bot.send_message(chat_id=admin_payload, text=admin_payload, parse_mode="Markdown", reply_markup=reply_markup)
             except Exception: await context.bot.send_message(chat_id=SIGNAL_CHAT_ID, text=admin_payload, reply_markup=reply_markup)
             await update.message.reply_text("✅ **تم رفع الـ ID مالتك لغرفة مراجعة الإدارة بنجاح! جاري فحص حسابك وتفعيله الحين مدى الحياة، انتظر إشعار القبول الفوري الحين بالخاص.**")
         else:
@@ -415,36 +417,6 @@ async def handle_text_buttons(update: Update, context):
 
     if "طلب صفقة مضاربة" in text:
         await update.message.reply_text("⚠️ **ليدر! يرجى إرسال لقطة شاشة واضحة كلياً ونظيفة من منصة TradingView حصراً على الفريم المطلوب الحين (صورة عادية أو كملف Document) لتجنب رفض الطلب من عيون المحرك الحين.** 📈")
-        
-    elif "تجربة يومية مجانية" in text:
-        allowed, rem_count = check_user_trial_status(user_id)
-        if not allowed:
-            lock_msg = (
-                "⚠️ **عذراً يا ليدر! لقد استهلكت الـ 3 محاولات المجانية المخصصة لحسابك لهذا الأسبوع.** ⚠️\n\n"
-                "🎯 **للاستكمال الدائم مدى الحياة مجاناً وبدون أي قيود، عليك الانضمام للوكالة الخاصة بي الحين فوراً:**\n\n"
-                "1️⃣ **سجل حسابك الجديد الحين حصراً من رابط الوكالة مالتنا:**\n"
-                "🔗 https://one.justmarkets.link/a/tr42sl0svg\n\n"
-                "2️⃣ **أدخل كود الشراكة للتأكيد:** `tr42sl0svg`\n"
-                "3️⃣ **قم بتفعيل حسابك وإيداع رأس مال التداول الخاص بك الحين.**\n\n"
-                "📞 يرجى إرسال الـ ID الخاص بك الحين مباشرة في الشات بالأسفل، وسيتم رفعه للإدارة فوراً لتفعيل الحساب الكلي مدى الحياة! 🚀🦅🔥"
-            )
-            context.user_data['awaiting_id'] = True
-            await update.message.reply_text(lock_msg, parse_mode="Markdown")
-            return
-
-        await update.message.reply_text("🎁 **التجربة المجانية الحية للجدد الحين:** جاري قنص نبض الذهب الحالي بالمحاور الفورية...")
-        try:
-            market_info = get_twelve_data_multi_frame("xau")
-            from ai_analyst import analyze_market_data_text
-            analysis_result = analyze_market_data_text(market_info)
-            
-            increment_user_trial(user_id)
-            _, current_rem = check_user_trial_status(user_id)
-            
-            output = f"🎁 **صفقة تجريبية مجانية حية الحين (Just Martink Free Trial):** 🎁\n\n{analysis_result}\n\n📊 *بقي لك الحين {current_rem} محاولات مجانية لنهاية هذا الأسبوع ملوكي الحين.*"
-            try: await update.message.reply_text(output, parse_mode="Markdown")
-            except Exception: await update.message.reply_text(output)
-        except Exception as e: await update.message.reply_text(f"❌ خوادم التصويت ممتلئة بالطلبات الحين: {str(e)}")
         
     elif "Just Martink" in text or "VIP" in text:
         await update.message.reply_text(
