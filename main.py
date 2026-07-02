@@ -234,6 +234,53 @@ async def scan_now_command(update: Update, context):
     except Exception as e: 
         await update.message.reply_text(f"❌ خطأ بغرفة الفرز اللحظي: {str(e)}")
 
+async def admin_analyze_command(update: Update, context):
+    """
+    🔒 أمر داخلي للإدارة فقط: /admin_analyze <asset>
+    - يشتغل فقط داخل جروب الإدارة المسجل (SIGNAL_CHAT_ID).
+    - يعتمد على مؤشرات فنية محسوبة رياضياً فعلياً (RSI/EMA/MACD) وليس رقم مختلق.
+    - بعد ما يطلع التقرير، الإدارة تراجعه وتقرر بضغطة زر: تنشره لمجموعة VIP أو ترفضه.
+    """
+    global SIGNAL_CHAT_ID
+    if not SIGNAL_CHAT_ID or update.effective_chat.id != SIGNAL_CHAT_ID:
+        return  # يتجاهل الأمر تماماً لو انطلب من خارج جروب الإدارة
+
+    asset_keyword = context.args[0] if context.args else "xau"
+    await update.message.reply_text(f"🧮 جاري حساب المؤشرات الفنية الحقيقية لـ `{asset_keyword}`...", parse_mode="Markdown")
+
+    from indicators import fetch_and_compute, format_indicators_for_ai
+    data, error = fetch_and_compute(asset_keyword)
+    if error:
+        await update.message.reply_text(error)
+        return
+
+    indicators_text = format_indicators_for_ai(data)
+
+    from ai_analyst import generate_admin_technical_report
+    report = generate_admin_technical_report(indicators_text)
+
+    final_message = (
+        f"📊 **تقرير تحليل فني - أرقام محسوبة رياضياً من بيانات السوق الفعلية**\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📐 **الأرقام الخام:**\n{indicators_text}\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🧠 **تفسير الذكاء الاصطناعي:**\n{report}"
+    )
+
+    # نفس أزرار النشر/الرفض المستخدمة بأمر /scan_now، تعيد استخدام نفس الكولباك
+    # الموجود أصلاً بالبوت (handle_callback_queries) بدون أي تعديل عليه.
+    keyboard = [
+        [InlineKeyboardButton("🚀 نشر لمجموعة VIP", callback_data="publish_vip"),
+         InlineKeyboardButton("❌ رفض التقرير", callback_data="reject_vip")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    try:
+        await update.message.reply_text(final_message, parse_mode="Markdown", reply_markup=reply_markup)
+    except Exception:
+        await update.message.reply_text(final_message, reply_markup=reply_markup)
+
+
 async def process_user_chart(update: Update, context, is_doc=False):
     user_id = update.effective_user.id
     now = time.time()
@@ -466,6 +513,7 @@ if __name__ == '__main__':
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("setup_signals", setup_signals_command))
     application.add_handler(CommandHandler("scan_now", scan_now_command))
+    application.add_handler(CommandHandler("admin_analyze", admin_analyze_command))
     application.add_handler(CallbackQueryHandler(handle_callback_queries))
     application.add_handler(MessageHandler(filters.PHOTO, handle_chart_photo))
     application.add_handler(MessageHandler(filters.Document.ALL, handle_chart_document))
