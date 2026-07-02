@@ -236,12 +236,13 @@ async def process_user_chart(update: Update, context, is_doc=False):
     user_id = update.effective_user.id
     now = time.time()
     
+    # 🔥 التحديث الجبار الحين: تعديل فلتر الحماية لـ 3 دقائق فقط (180 ثانية بالتمام والكمال) الحين الحين
     if user_id in cooldowns:
         elapsed = now - cooldowns[user_id]
-        if elapsed < 600:
-            rem_mins = int((600 - elapsed) // 60)
-            rem_secs = int((600 - elapsed) % 60)
-            await update.message.reply_text(f"⚠️ **عذراً ليدر! نظام حماية السيرفر مفعّل الحين.**\nيرجى الانتظار `{rem_mins}` دقائق و `{rem_secs}` thوانٍ قبل إرسال شارت جديد لحظر السبام.", parse_mode="Markdown")
+        if elapsed < 180:
+            rem_mins = int((180 - elapsed) // 60)
+            rem_secs = int((180 - elapsed) % 60)
+            await update.message.reply_text(f"⚠️ **عذراً ليدر! نظام حماية السيرفر مفعّل الحين.**\nيرجى الانتظار `{rem_mins}` دقائق و `{rem_secs}` ثوانٍ قبل إرسال شارت جديد لحظر السبام.", parse_mode="Markdown")
             return
 
     allowed, rem_count = check_user_trial_status(user_id)
@@ -270,11 +271,11 @@ async def process_user_chart(update: Update, context, is_doc=False):
         from ai_analyst import analyze_chart_image
         analysis_text = analyze_chart_image(image_bytes)
         
-        # 🔥 ذكاء الفحص الفولاذي: إذا رجع خطأ أو تنبيه طوارئ، مستحيل نخصم محاولة ومستحيل نشغل الكول داون!
+        # ذكاء الفحص: لو رجع خطأ أو تنبيه طوارئ، مستحيل يخصم محاولة ومسح العداد الحين
         if "⚠️" in analysis_text or "❌" in analysis_text:
             final_output = analysis_text
         else:
-            # نجح الفرز كلياً -> الحين فقط نخصم المحاولة ونفعّل عداد الـ 10 دقائق
+            # نجح الفرز الحين كلياً -> الحين نخصم ونفعّل الـ 3 دقائق
             increment_user_trial(user_id)
             cooldowns[user_id] = now
             _, current_rem = check_user_trial_status(user_id)
