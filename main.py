@@ -17,7 +17,7 @@ CONFIG_FILE = "signals_config.json"
 DATA_FILE = "user_analytics.json"
 SIGNAL_CHAT_ID = None
 
-# حقن الآي دي الصافي مالت مجموعة الـ VIP كقيمة افتراضية حتمية الحين
+# 🔥 حقن الآي دي الصافي مالت مجموعة الـ VIP كقيمة افتراضية حتمية الحين
 RAW_VIP_ID = os.environ.get("VIP_CHAT_ID", "-1004372200363")
 try:
     VIP_CHAT_ID = int(RAW_VIP_ID)
@@ -156,6 +156,7 @@ def increment_user_trial(user_id):
         db[u_id]["total_used"] += 1
         save_user_data(db)
 
+# 🔥 دالة الفرز الدوري التلقائي في الخلفية الحين
 async def market_scanner_loop(application: Application):
     try:
         while True:
@@ -176,6 +177,7 @@ async def market_scanner_loop(application: Application):
                 except Exception: pass
     except asyncio.CancelledError: pass
 
+# 🔥 تثبيت دالة الـ post_init بوضوح صارم لمنع خطأ NameError الحين الحين
 async def post_init(application: Application) -> None:
     load_stored_chat_id()
     task = asyncio.create_task(market_scanner_loop(application))
@@ -236,7 +238,7 @@ async def process_user_chart(update: Update, context, is_doc=False):
     user_id = update.effective_user.id
     now = time.time()
     
-    # 🔥 التحديث الجبار الحين: تعديل فلتر الحماية لـ 3 دقائق فقط (180 ثانية بالتمام والكمال) الحين الحين
+    # 🔥 فلتر الحماية المحدث لـ 3 دقائق فقط (180 ثانية بالتمام والكمال) الحين
     if user_id in cooldowns:
         elapsed = now - cooldowns[user_id]
         if elapsed < 180:
@@ -271,7 +273,7 @@ async def process_user_chart(update: Update, context, is_doc=False):
         from ai_analyst import analyze_chart_image
         analysis_text = analyze_chart_image(image_bytes)
         
-        # ذكاء الفحص: لو رجع خطأ أو تنبيه طوارئ، مستحيل يخصم محاولة ومسح العداد الحين
+        # ذكاء الفحص: لو رجع خطأ أو تنبيه طوارئ، مستحيل نخصم محاولة ومسح العداد الحين
         if "⚠️" in analysis_text or "❌" in analysis_text:
             final_output = analysis_text
         else:
@@ -289,6 +291,12 @@ async def process_user_chart(update: Update, context, is_doc=False):
             
     except Exception as e:
         await update.message.reply_text(f"❌ خطأ فني أثناء مسح الشارت البصري الحين: {str(e)}")
+
+async def update_user_status_message(query, text, badge):
+    try:
+        await query.edit_message_text(text=f"{text}\n\n{badge}")
+    except Exception:
+        pass
 
 async def handle_chart_photo(update: Update, context):
     await process_user_chart(update, context, is_doc=False)
@@ -311,15 +319,15 @@ async def handle_callback_queries(update: Update, context):
             try:
                 recommendation_text = query.message.text
                 await context.bot.send_message(chat_id=VIP_CHAT_ID, text=f"👑 **إشارة مؤسسية معتمدة حية الآن** 👑\n\n{recommendation_text}")
-                await query.edit_message_text(text=f"{query.message.text}\n\n✅ **[غرفة العمليات]: تم بث ونشر التوصية بنجاح لمجموعة الـ VIP الحين!**")
+                await update_user_status_message(query, query.message.text, "✅ **[غرفة العمليات]: تم بث ونشر التوصية بنجاح لمجموعة الـ VIP الحين!**")
             except Exception as e:
-                await query.edit_message_text(text=f"{query.message.text}\n\n❌ **خطأ في بث الـ VIP: {str(e)}**")
+                await update_user_status_message(query, query.message.text, f"❌ **خطأ في بث الـ VIP: {str(e)}**")
         else:
-            await query.edit_message_text(text=f"{query.message.text}\n\n⚠️ **تنبيه الإدارة: معرّف VIP غير متاح كلياً.**")
+            await update_user_status_message(query, query.message.text, "⚠️ **تنبيه الإدارة: معرّف VIP غير متاح كلياً.**")
         return
         
     elif data == "reject_vip":
-        await query.edit_message_text(text=f"{query.message.text}\n\n❌ **[غرفة العمليات]: تم رفض وإلغاء التوصية من قبل الإدارة كلياً الحين.**")
+        await update_user_status_message(query, query.message.text, "❌ **[غرفة العمليات]: تم رفض وإلغاء التوصية من قبل الإدارة كلياً الحين.**")
         return
 
     db = load_user_data()
@@ -331,7 +339,7 @@ async def handle_callback_queries(update: Update, context):
         
         db[target_uid]["status"] = "APPROVED_VIP"
         save_user_data(db)
-        await query.edit_message_text(text=f"{query.message.text}\n\n✅ **تم اعتماد الحساب وترقيته لـ VIP مدى الحياة بنجاح الحين!**")
+        await update_user_status_message(query, query.message.text, "✅ **تم اعتماد الحساب وترقيته لـ VIP مدى الحياة بنجاح الحين!**")
         try:
             vip_alert = (
                 "👑 **تهانينا يا ليدر! تم مراجعة حسابك واعتماده من قبل الإدارة كلياً!** 👑\n\n"
@@ -347,7 +355,7 @@ async def handle_callback_queries(update: Update, context):
             db[target_uid]["status"] = "FREE"
             db[target_uid]["week_used"] = 3
             save_user_data(db)
-        await query.edit_message_text(text=f"{query.message.text}\n\n🔴 **تم رفض الطلب وإرسال إشعار المراجعة للمستخدم فوراً.**")
+        await update_user_status_message(query, query.message.text, "🔴 **تم رفض الطلب وإرسال إشعار المراجعة للمستخدم فوراً.**")
         try:
             reject_alert = "❌ **[إشعار نظام العمليات]: تم رفض طلبك الحين.. عليك الاستفسار للمراجعة وتأكيد حسابك ثانية عبر الدعم الفني.**"
             await context.bot.send_message(chat_id=int(target_uid), text=reject_alert, parse_mode="Markdown")
