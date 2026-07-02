@@ -24,7 +24,6 @@ def fetch_model_stance_and_text(provider, url, headers, payload, response_type="
         if res.status_code == 200:
             res_data = res.json()
             content = res_data['choices'][0]['message']['content'] if response_type == "openai" else res_data.get('text', '')
-            
             stance = "HOLD"
             if "شراء" in content or "BUY" in content.upper(): stance = "BUY"
             elif "بيع" in content or "SELL" in content.upper(): stance = "SELL"
@@ -73,15 +72,15 @@ def analyze_market_data_text(indicators_text):
     )
 
 def analyze_chart_image(image_bytes):
-    """👁️ العين البصرية الإنتاجية: قراءة شارتات الآيفون بالمسار الصافي v1 لحرق خطأ 404 كلياً للأبد"""
+    """👁️ تشغيل وحش جيميناي الحديث لعام 2026 لإنهاء خطأ 404 للأبد"""
     if not GEMINI_API_KEY:
         return "❌ خطأ سيرفر: يرجى تزويد ريندر بمفتاح `GEMINI_API_KEY` المجاني لتفعيل العين البصرية للشارتات الحين."
         
     try:
         image_base64 = base64.b64encode(image_bytes).decode('utf-8')
         
-        # 🔥 الإغلاق الصارم: الانتقال إلى رابط الإنتاج الرسمي المستقر v1 وحذف كلمة beta تماماً
-        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        # 🔥 الصافي دغري: استهداف الموديل الجديد المعتمد والشغال حالياً لعام 2026
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
         
         vision_prompt = (
             "You are the Head of Technical Analysis at SmartEntry Global Fund. Look carefully at this screenshot image of a financial chart from the user's mobile.\n"
@@ -99,7 +98,7 @@ def analyze_chart_image(image_bytes):
                     {"inline_data": {"mime_type": "image/jpeg", "data": image_base64}}
                 ]
             }],
-            "generation_config": {"temperature": 0.0}
+            "generationConfig": {"temperature": 0.0}
         }
         
         res = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}, timeout=15)
@@ -107,12 +106,11 @@ def analyze_chart_image(image_bytes):
             res_json = res.json()
             if 'candidates' in res_json and len(res_json['candidates']) > 0:
                 report = res_json['candidates'][0]['content']['parts'][0]['text']
-                return f"👑 **SmartEntry Global | وحدة التحليل البصري الحية والذكية** 👑\n\n" + report
+                return f"👑 **SmartEntry Global | وحدة التحليل البصري المباشر** 👑\n\n" + report
             else:
                 return f"❌ خطأ: استجابة خادم الرؤية فارغة، يرجى إعادة التقاط الصورة وإرسالها الحين."
         else:
-            # 🛡️ حقن نظام كاشف الأعطال الفوري: طباعة نص رد جوجل الحقيقي لمنع التخمين نهائياً
-            return f"❌ **خطأ في خادم الرؤية المباشر (كود {res.status_code}):**\n`{res.text[:140]}`\n\n💡 *إجراء فوري الحين:* تأكد من سلامة وصحة المفتاح المضاف في ريندر."
+            return f"❌ **خطأ في خادم الرؤية المباشر (كود {res.status_code}):**\n`{res.text[:140]}`"
             
     except Exception as e:
         return f"❌ خطأ فني أثناء مسح الشارت البصري الحين: {str(e)[:100]}"
